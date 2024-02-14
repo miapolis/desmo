@@ -33,14 +33,12 @@ subst!(param, x1, y1, x2, y2, (
 ));
 
 ns grid {
-  fn generateGrid() {
-    [
-      param!(0, 0, gridSize, 0),
-      param!(gridSize, 0, gridSize, gridSize),
-      param!(gridSize, gridSize, 0, gridSize),
-      param!(0, gridSize, 0, 0)
-    ]
-  }
+  show [
+    param!(0, 0, gridSize, 0),
+    param!(gridSize, 0, gridSize, gridSize),
+    param!(gridSize, gridSize, 0, gridSize),
+    param!(0, gridSize, 0, 0)
+  ] @{ color: "black" }
 }
 
 ns walls {
