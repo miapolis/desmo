@@ -1,16 +1,36 @@
 import script "./maze.mjs"
 
 settings @{
-    viewport: @{ xmin: -2, ymin: -2, xmax: 22, ymax: 22 },
+    viewport: @{ xmin: -18, ymin: -20, xmax: 19, ymax: 40 },
     showGrid: false,
     showXAxis: false,
     showYAxis: false,
     userLockedViewport: true
   }
 
-gridSize = 20;
+gridSize = 10;
+proj = 3.5;
 
-subst!(param, x1, y1, x2, y2, ((1 - t) * x1 + t * x2, (1 - t) * y1 + t * y2));
+cacheCos = cos(proj / 6);
+cacheSin = sin(proj / 6);
+
+ns camera {
+  x = 0;
+  y = 0;
+}
+
+"ticker @{ handlerLatex: ds(camera.x -> camera.x + 0.5), playing: true, open: true }"
+
+"subst!(param, x1, y1, x2, y2, ((1 - t) * x1 + t * x2, (1 - t) * y1 + t * y2));"
+subst!(param, x1, y1, x2, y2, (
+      cacheCos * ((1 - t) * x1 + t * x2)
+      - cacheCos * ((1 - t) * y1 + t * y2)
+      + camera.x,
+      cacheSin * ((1 - t) * x1 + t * x2)
+      + cacheSin * ((1 - t) * y1 + t * y2)
+      + camera.y
+      - 1
+));
 
 ns grid {
   fn generateGrid() {

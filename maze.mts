@@ -2,14 +2,14 @@ export default function ({ scope, addMacro }) {
   addMacro({
     name: "maze",
     fn: (node, a) => {
-      const cells = generateMaze().flat();
+      const cells = createOptimizedMaze();
       const walls = cells.map((cell) => cell.walls).flat();
       return a.parseExpr(`[${walls.join(",")}]`);
     },
   });
 }
 
-const GRID_SIZE = 20;
+const GRID_SIZE = 10;
 const CELL_COUNT = GRID_SIZE ** 2;
 
 const FIRST_CELL = "FIRST_CELL";
@@ -22,6 +22,18 @@ const cellMarkers = new Map([
   ["0,0", (cell: Cell) => cell.markAsStart()],
   [LAST_COORD, (cell: Cell) => cell.markAsFinish()],
 ]);
+
+export const createOptimizedMaze = () => {
+  const cells = generateMaze().flat() as Cell[];
+  // Remove outer most walls
+  for (const cell of cells) {
+    if (cell.col == 0) cell.walls[3] = 0;
+    if (cell.col == GRID_SIZE - 1) cell.walls[1] = 0;
+    if (cell.row == 0) cell.walls[0] = 0;
+    if (cell.row == GRID_SIZE - 1) cell.walls[2] = 0;
+  }
+  return cells;
+};
 
 export const generateMaze = (
   cells = generateCells(),
@@ -50,7 +62,7 @@ const createFilledArray = (length: number, predicate: any) =>
     .fill(null)
     .map((_, i) => predicate(i));
 
-const generateCells = () => {
+const generateCells = (): Cell[] => {
   return createFilledArray(GRID_SIZE, (col: number) =>
     createFilledArray(GRID_SIZE, (row: number) => new Cell(col, row))
   );
