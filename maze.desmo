@@ -44,42 +44,32 @@ ns grid {
 }
 
 ns walls {
-  subst!(idx, w, floor((w - 1) / 4));
-  subst!(row, w, floor(idx!(w) / gridSize));
-  subst!(col, w, mod(idx!(w), gridSize));
-  
   subst!(
-top,
-      w,
-      param!(col!(w), gridSize - row!(w), col!(w) + 1, gridSize - row!(w))
+drawRow,
+      rowIndex,
+      startCol,
+      length,
+      param!(startCol, gridSize - rowIndex, startCol + length, gridSize - rowIndex)
+    );
+  subst!(
+drawCol,
+      colIndex,
+      startRow,
+      length,
+      param!(colIndex, gridSize - startRow, colIndex, gridSize - startRow - length)
     );
   
-  subst!(
-right,
-      w,
-      param!(col!(w) + 1, gridSize - row!(w), col!(w) + 1, gridSize - row!(w) - 1)
-    );
+  "[rowIndex, startCol, length, rowIndex, startCol, length, ...]"
+  rows = consolidateRows!();
+  cols = consolidateCols!();
   
-  subst!(
-bottom,
-      w,
-      param!(col!(w), gridSize - row!(w) - 1, col!(w) + 1, gridSize - row!(w) - 1)
-    );
-  
-  subst!(
-left,
-      w,
-      param!(col!(w), gridSize - row!(w), col!(w), gridSize - row!(w) - 1)
-    );
-  
-  data = maze!();
   len = gridSize * gridSize * 4;
-  A = [{
-      data[w] > 0: {
-        mod(w, 4) == 0: top!(w),
-        mod(w, 4) == 1: left!(w),
-        mod(w, 4) == 2: bottom!(w),
-        mod(w, 4) == 3: right!(w)
-      }
-    } for w=[1..len]];
+  
+  show R = [drawRow!(rows[(i * 3 - 2)], rows[(i * 3 - 1)], rows[(i * 3)]) for
+    i=[1..length!(rows)]
+  ] @{ color: "red" }
+  
+  show C = [drawCol!(cols[(i * 3 - 2)], cols[(i * 3 - 1)], cols[(i * 3)]) for
+    i=[1..length!(cols)]
+  ] @{ color: "green" }
 }

@@ -1,10 +1,41 @@
-export default function ({ scope, addMacro }) {
+import { IdentifierNode } from "desmoscript/dist/ast/ast";
+import type { MacroAPI } from "desmoscript/dist/macro/macro-api";
+
+export default function ({ addMacro, addLatexMacro }) {
+  const { cells, consolidatedRows, consolidatedCols } = createOptimizedMaze();
+
   addMacro({
     name: "maze",
     fn: (node, a) => {
-      const cells = createOptimizedMaze();
       const walls = cells.map((cell) => cell.walls).flat();
       return a.parseExpr(`[${walls.join(",")}]`);
+    },
+  });
+
+  addMacro({
+    name: "consolidateRows",
+    fn: (node, a) => {
+      return a.parseExpr(`[${consolidatedRows.join(",")}]`);
+    },
+  });
+
+  addMacro({
+    name: "consolidateCols",
+    fn: (node, a) => {
+      return a.parseExpr(`[${consolidatedCols.join(",")}]`);
+    },
+  });
+
+  const unstable_parseIdent = (ident: string) => {
+    return `${ident.charAt(0).toUpperCase()}_{${ident.substring(1)}}`;
+  };
+
+  addLatexMacro({
+    name: "length",
+    fn: (node, a: MacroAPI) => {
+      return `\\operatorname{length}\\left(${unstable_parseIdent(
+        node.params[0].segments[0]
+      )}\\right)`;
     },
   });
 }
@@ -24,7 +55,10 @@ const cellMarkers = new Map([
 ]);
 
 export const createOptimizedMaze = () => {
-  const cells = generateMaze().flat() as Cell[];
+  const rows = generateMaze() as Cell[][];
+  const columns = transposeArray(rows);
+
+  const cells = rows.flat();
   // Remove outer most walls
   for (const cell of cells) {
     if (cell.col == 0) cell.walls[3] = 0;
@@ -32,7 +66,33 @@ export const createOptimizedMaze = () => {
     if (cell.row == 0) cell.walls[0] = 0;
     if (cell.row == GRID_SIZE - 1) cell.walls[2] = 0;
   }
-  return cells;
+
+  // Consolidate walls by first going row by row then column by column
+  // Syntax [rowIndex, startCol, length, rowIndex, startCol, length, ...]
+  const consolidatedRows = new Array<number>();
+  const consolidatedCols = new Array<number>();
+
+  // .entries() seems to be broken for the macros compiler target, use a manual index instead
+  let i = 0;
+  for (const cells of rows) {
+    const transformed = groupConsecutives(cells.map((cell) => cell.walls[1]));
+    consolidatedRows.push(
+      ...transformed.map((group) => [i + 1, group.index, group.length]).flat()
+    );
+    i++;
+  }
+
+  let k = 0;
+  for (const cells of columns) {
+    // Get the right walls of all the cells
+    const transformed = groupConsecutives(cells.map((cell) => cell.walls[0]));
+    consolidatedCols.push(
+      ...transformed.map((group) => [k, group.index, group.length]).flat()
+    );
+    k++;
+  }
+
+  return { cells, consolidatedRows, consolidatedCols };
 };
 
 export const generateMaze = (
@@ -153,4 +213,35 @@ const createStack = <T extends never>() => {
     push,
     pop,
   };
+};
+
+type LengthIndexPair = { index: number; length: number };
+
+const groupConsecutives = (arr: number[]): LengthIndexPair[] => {
+  const result: LengthIndexPair[] = [];
+  let length = 0;
+  let startIndex = -1;
+
+  for (let i = 0; i < arr.length; i++) {
+    if (arr[i] === 1) {
+      length++;
+      if (startIndex === -1) {
+        startIndex = i;
+      }
+    }
+    if (arr[i] === 0 || i === arr.length - 1) {
+      if (length > 0) {
+        result.push({ index: startIndex, length: length });
+        length = 0;
+        startIndex = -1;
+      }
+    }
+  }
+
+  return result;
+};
+
+// prettier-ignore
+const transposeArray = <T,>(matrix: T[][]): T[][] => {
+  return matrix[0].map((_, colIndex) => matrix.map((row) => row[colIndex]));
 };
