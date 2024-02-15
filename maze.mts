@@ -1,4 +1,3 @@
-import { IdentifierNode } from "desmoscript/dist/ast/ast";
 import type { MacroAPI } from "desmoscript/dist/macro/macro-api";
 
 export default function ({ addMacro, addLatexMacro }) {
@@ -40,7 +39,7 @@ export default function ({ addMacro, addLatexMacro }) {
   });
 }
 
-const GRID_SIZE = 10;
+const GRID_SIZE = 12;
 const CELL_COUNT = GRID_SIZE ** 2;
 
 const FIRST_CELL = "FIRST_CELL";
