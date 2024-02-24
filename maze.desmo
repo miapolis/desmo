@@ -193,6 +193,22 @@ subst!(paramd, x1, y1, x2, y2, offsetX, offsetY, (
       - 1
 ));
 
+subst!(xy, xVar, yVar, (
+      cacheCos * xVar - cacheCos * yVar + camera.cameraX,
+      cacheSin * xVar + cacheSin * yVar + camera.cameraY - 1
+));
+subst!(shiftXy, xVar, yVar, offsetY, (
+      cacheCos * xVar - cacheCos * yVar + camera.cameraX,
+      cacheSin * xVar + cacheSin * yVar + camera.cameraY - 1 - offsetY
+));
+
+subst!(wall, x1, y1, x2, y2, polygon(
+xy!(x1, y1),
+      xy!(x2, y2),
+      shiftXy!(x2, y2, gridOffset),
+      shiftXy!(x1, y1, gridOffset)
+    ));
+
 ns grid {
   idx = [0, 0, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 0, 1, 0, 0];
   subst!(p, i, n, idx[(i * 4 - n)] * gridSize);
@@ -209,7 +225,7 @@ drawRow,
       rowIndex,
       startCol,
       length,
-      param!(startCol, gridSize - rowIndex, startCol + length, gridSize - rowIndex)
+      wall!(startCol, gridSize - rowIndex, startCol + length, gridSize - rowIndex)
     );
   
   subst!(
@@ -224,7 +240,7 @@ drawCol,
       colIndex,
       startRow,
       length,
-      param!(colIndex, gridSize - startRow, colIndex, gridSize - startRow - length)
+      wall!(colIndex, gridSize - startRow, colIndex, gridSize - startRow - length)
     );
   
   subst!(shiftRow, rowIndex, startCol, length, paramd!(
@@ -254,33 +270,9 @@ colIndex,
   
   show R = [drawRow!(rows[(i * 3 - 2)], rows[(i * 3 - 1)], rows[(i * 3)]) for
     i=[1..length!(rows)]
-  ] @{ color: "rgb(68,13,75)" }
-  
-  show RP = [drawPillar!(rows[(i * 3 - 2)], rows[(i * 3 - 1)], gridOffset) for
-    i=[1..length!(rows)]
-  ] @{ color: "rgb(68,13,75)" }
-  
-  show RP2 = [drawPillar!(rows[(i * 3 - 2)], rows[(i * 3 - 1)] + rows[(i * 3)], gridOffset) for
-    i=[1..length!(rows)]
-  ] @{ color: "rgb(68,13,75)" }
-  
-  show CP = [drawPillar!(cols[(i * 3 - 1)], cols[(i * 3 - 2)], gridOffset) for
-    i=[1..length!(cols)]
-  ] @{ color: "rgb(68,13,75)" }
-  
-  show CP2 = [drawPillar!(cols[(i * 3 - 1)] + cols[(i * 3)], cols[(i * 3 - 2)], gridOffset) for
-    i=[1..length!(cols)]
-  ] @{ color: "rgb(68,13,75)" }
+  ] @{ color: "rgb(245,13,10)", fillOpacity: "1" }
   
   show C = [drawCol!(cols[(i * 3 - 2)], cols[(i * 3 - 1)], cols[(i * 3)]) for
     i=[1..length!(cols)]
-  ] @{ color: "rgb(68,13,75)" }
-  
-  show R2 = [shiftRow!(rows[(i * 3 - 2)], rows[(i * 3 - 1)], rows[(i * 3)]) for
-    i=[1..length!(rows)]
-  ] @{ color: "rgb(68,13,75)" }
-  
-  show C2 = [shiftCol!(cols[(i * 3 - 2)], cols[(i * 3 - 1)], cols[(i * 3)]) for
-    i=[1..length!(cols)]
-  ] @{ color: "rgb(68,13,75)" }
+  ] @{ color: "rgb(68,13,75)", fillOpacity: "1" }
 }
