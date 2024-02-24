@@ -175,6 +175,11 @@ subst!(param, x1, y1, x2, y2, (
       - 1
 ));
 
+subst!(vert, x, y, length, (
+      x * cacheCos - y * cacheCos + camera.cameraX,
+      x * cacheSin + y * cacheSin - length * t - 1 + camera.cameraY
+));
+
 subst!(paramd, x1, y1, x2, y2, offsetX, offsetY, (
       cacheCos * ((1 - t) * x1 + t * x2)
       - cacheCos * ((1 - t) * y1 + t * y2)
@@ -192,8 +197,9 @@ ns grid {
   subst!(p, i, n, idx[(i * 4 - n)] * gridSize);
   
   show [param!(p!(i, 3), p!(i, 2), p!(i, 1), p!(i, 0)) for i=[1..16]] @{ color: "black" }
-  
-  show param!(0, 12, 0, 11) @{ color: "red" }
+  show [paramd!(p!(i, 3), p!(i, 2), p!(i, 1), p!(i, 0), 0, gridOffset * -1) for
+    i=[1..16]
+  ] @{ color: "black" }
 }
 
 ns walls {
@@ -203,6 +209,13 @@ drawRow,
       startCol,
       length,
       param!(startCol, gridSize - rowIndex, startCol + length, gridSize - rowIndex)
+    );
+  
+  subst!(
+drawPillar,
+      rowIndex,
+      startCol,
+      vert!(startCol, gridSize - rowIndex, gridOffset)
     );
   
   subst!(
@@ -242,7 +255,31 @@ colIndex,
     i=[1..length!(rows)]
   ] @{ color: "rgb(68,13,75)" }
   
+  show RP = [drawPillar!(rows[(i * 3 - 2)], rows[(i * 3 - 1)], gridOffset) for
+    i=[1..length!(rows)]
+  ] @{ color: "rgb(68,13,75)" }
+  
+  show RP2 = [drawPillar!(rows[(i * 3 - 2)], rows[(i * 3 - 1)] + rows[(i * 3)], gridOffset) for
+    i=[1..length!(rows)]
+  ] @{ color: "rgb(68,13,75)" }
+  
+  show CP = [drawPillar!(cols[(i * 3 - 1)], cols[(i * 3 - 2)], gridOffset) for
+    i=[1..length!(cols)]
+  ] @{ color: "rgb(68,13,75)" }
+  
+  show CP2 = [drawPillar!(cols[(i * 3 - 1)] + cols[(i * 3)], cols[(i * 3 - 2)], gridOffset) for
+    i=[1..length!(cols)]
+  ] @{ color: "rgb(68,13,75)" }
+  
   show C = [drawCol!(cols[(i * 3 - 2)], cols[(i * 3 - 1)], cols[(i * 3)]) for
+    i=[1..length!(cols)]
+  ] @{ color: "rgb(68,13,75)" }
+  
+  show R2 = [shiftRow!(rows[(i * 3 - 2)], rows[(i * 3 - 1)], rows[(i * 3)]) for
+    i=[1..length!(rows)]
+  ] @{ color: "rgb(68,13,75)" }
+  
+  show C2 = [shiftCol!(cols[(i * 3 - 2)], cols[(i * 3 - 1)], cols[(i * 3)]) for
     i=[1..length!(cols)]
   ] @{ color: "rgb(68,13,75)" }
 }
