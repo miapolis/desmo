@@ -23,18 +23,109 @@ ns camera {
   y = 0;
 }
 
-"ticker @{ handlerLatex: ds(camera.x -> camera.x + 0.5), playing: true, open: true }"
+ticker @{ handlerLatex: ds(player.movePlayer()), playing: true, open: true }
 
-"subst!(param, x1, y1, x2, y2, ((1 - t) * x1 + t * x2, (1 - t) * y1 + t * y2));"
-subst!(param, x1, y1, x2, y2, (
-      cacheCos * ((1 - t) * x1 + t * x2)
-      - cacheCos * ((1 - t) * y1 + t * y2)
-      + camera.x,
-      cacheSin * ((1 - t) * x1 + t * x2)
-      + cacheSin * ((1 - t) * y1 + t * y2)
-      + camera.y
-      - 1
-));
+ns player {
+  row = 0;
+  col = 0;
+  
+  x = col;
+  y = gridSize - row;
+  
+  targetRow = row;
+  targetCol = col;
+  
+  targetX = 0;
+  targetY = gridSize;
+  
+  frame = 0;
+  lastAnimStart = 0;
+  
+  show player = (cos(t) * cos(t) + x, cos(t) * sin(t) + y) @{ parametricDomain: @{ min: ds(-10), max: ds(10) } }
+  
+  fn lerp(a, b, time) {
+    (1 - time) * a + time * b
+  }
+  fn delta() {
+    mod((frame - lastAnimStart), 60) / 60
+  }
+  
+  fn movePlayer() {
+    targetX -> targetCol
+      , targetY -> gridSize - targetRow - 0.5
+      , x -> lerp(x, targetX, delta())
+      , y -> lerp(y, targetY, delta())
+      , row -> targetRow
+      , col -> targetCol
+      , frame -> frame + 1
+  }
+}
+
+ns controls {
+  subst!(not, a, 1 - a);
+  subst!(anim, player.lastAnimStart -> player.frame);
+  
+  show (-1, -1) @{
+    clickableInfo: @{
+      enabled: true,
+      latex: ds(player.targetRow -> player.targetRow - not!(checkUp()) , anim!())
+    }
+  }
+  show (-1, -2) @{
+    clickableInfo: @{
+      enabled: true,
+      latex: ds(player.targetRow -> player.targetRow + not!(checkDown()) , anim!())
+    }
+  }
+  show (-1.5, -1.5) @{
+    clickableInfo: @{
+      enabled: true,
+      latex: ds(player.targetCol -> player.targetCol - not!(checkLeft()) , anim!())
+    }
+  }
+  show (-0.5, -1.5) @{
+    clickableInfo: @{
+      enabled: true,
+      latex: ds(player.targetCol -> player.targetCol + not!(checkRight()) , anim!())
+    }
+  }
+  
+  fn getCellIndex(row, col) {
+    row * gridSize + col + 1
+  }
+  
+  show fn getCellWalls(idx) {
+    [
+      walls.binary[(idx * 4 - 3)],
+      walls.binary[(idx * 4 - 2)],
+      walls.binary[(idx * 4 - 1)],
+      walls.binary[(idx * 4)]
+    ]
+  } @{ hidden: true }
+  
+  subst!(diff, a, b, a - b);
+  
+  fn checkUp() {
+    { player.row > 0: getCellWalls(getCellIndex(player.row, player.col))[4], 1 }
+  }
+  fn checkDown() {
+    {
+      player.row < diff!(gridSize, 1): getCellWalls(getCellIndex(player.row, player.col))[2],
+      1
+    }
+  }
+  fn checkLeft() {
+    { player.col > 0: getCellWalls(getCellIndex(player.row, player.col))[1], 1 }
+  }
+  fn checkRight() {
+    {
+      player.col < diff!(gridSize, 1): getCellWalls(getCellIndex(player.row, player.col))[3],
+      1
+    }
+  }
+}
+
+subst!(param, x1, y1, x2, y2, ((1 - t) * x1 + t * x2, (1 - t) * y1 + t * y2));
 
 subst!(paramd, x1, y1, x2, y2, offsetX, offsetY, (
       cacheCos * ((1 - t) * x1 + t * x2)
@@ -53,9 +144,6 @@ ns grid {
   subst!(p, i, n, idx[(i * 4 - n)] * gridSize);
   
   show [param!(p!(i, 3), p!(i, 2), p!(i, 1), p!(i, 0)) for i=[1..16]] @{ color: "black" }
-  show [paramd!(p!(i, 3), p!(i, 2), p!(i, 1), p!(i, 0), 0, gridOffset * -1) for
-    i=[1..16]
-  ] @{ color: "rgb(0,0,0)" }
 }
 
 ns walls {
@@ -93,6 +181,7 @@ colIndex,
         gridOffset * -1
       ));
   
+  binary = maze!();
   "[rowIndex, startCol, length, rowIndex, startCol, length, ...]"
   rows = consolidateRows!();
   cols = consolidateCols!();
@@ -104,14 +193,6 @@ colIndex,
   ] @{ color: "rgb(68,13,75)" }
   
   show C = [drawCol!(cols[(i * 3 - 2)], cols[(i * 3 - 1)], cols[(i * 3)]) for
-    i=[1..length!(cols)]
-  ] @{ color: "rgb(68,13,75)" }
-  
-  show R2 = [shiftRow!(rows[(i * 3 - 2)], rows[(i * 3 - 1)], rows[(i * 3)]) for
-    i=[1..length!(rows)]
-  ] @{ color: "rgb(68,13,75)" }
-  
-  show C2 = [shiftCol!(cols[(i * 3 - 2)], cols[(i * 3 - 1)], cols[(i * 3)]) for
     i=[1..length!(cols)]
   ] @{ color: "rgb(68,13,75)" }
 }
