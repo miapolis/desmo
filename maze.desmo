@@ -21,24 +21,25 @@ cacheSin = sin(proj / 6);
 subst!(diff, a, b, a - b);
 subst!(bool, v, { v: 1, 0 });
 
-ticker @{
-    handlerLatex: ds(player.movePlayer() , camera.adjustCameraToPlayer() , global.tick()),
-    playing: true,
-    open: true
-  }
+ticker @{ handlerLatex: ds(gameLoopLatex!()), playing: true, open: true }
+
+fn gameLoop(delta) {
+  player.movePlayer() , camera.adjustCameraToPlayer() , global.tick(delta)
+}
 
 ns global {
   frame = 0;
+  deltaTime = 0;
   
   fn lerp(a, b, time) {
-    (1 - time) * a + time * b
+    (1 - time * deltaTime / 16) * a + time * deltaTime / 16 * b
   }
   show fn delta(start, duration) {
     mod((frame - start), duration) / duration
   } @{ hidden: true }
   
-  fn tick() {
-    frame -> frame + 1
+  fn tick(elapsed) {
+    frame -> frame + 1 , deltaTime -> elapsed
   }
 }
 

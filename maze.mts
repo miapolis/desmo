@@ -37,6 +37,13 @@ export default function ({ addMacro, addLatexMacro }) {
       )}\\right)`;
     },
   });
+
+  addLatexMacro({
+    name: "gameLoopLatex",
+    fn: (node, a: MacroAPI) => {
+      return "G_{ameLoop}\\left(\\operatorname{dt}\\right)";
+    },
+  });
 }
 
 const GRID_SIZE = 12;
