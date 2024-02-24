@@ -18,12 +18,51 @@ gray = rgb(200, 200, 200);
 cacheCos = cos(proj / 6);
 cacheSin = sin(proj / 6);
 
-ns camera {
-  x = 0;
-  y = 0;
+subst!(diff, a, b, a - b);
+subst!(bool, v, { v: 1, 0 });
+
+ticker @{
+    handlerLatex: ds(player.movePlayer() , camera.adjustCameraToPlayer() , global.tick()),
+    playing: true,
+    open: true
+  }
+
+ns global {
+  frame = 0;
+  
+  fn lerp(a, b, time) {
+    (1 - time) * a + time * b
+  }
+  show fn delta(start, duration) {
+    mod((frame - start), duration) / duration
+  } @{ hidden: true }
+  
+  fn tick() {
+    frame -> frame + 1
+  }
 }
 
-ticker @{ handlerLatex: ds(player.movePlayer()), playing: true, open: true }
+ns camera {
+  cameraX = 0;
+  cameraY = 0;
+  
+  targetX = 0;
+  targetY = 0;
+  
+  lastAnimStart = 0;
+  
+  subst!(abs, a, { a > 0: a, -1 * a });
+  subst!(movingX, bool!(abs!(diff!(targetX, cameraX)) > 0.2));
+  
+  fn startCamera() {
+    lastAnimStart -> { movingX!() > 0: lastAnimStart, global.frame }
+  }
+  
+  fn adjustCameraToPlayer() {
+    targetX -> -1 * player.x
+      , cameraX -> global.lerp(cameraX, targetX, global.delta(lastAnimStart, 4000))
+  }
+}
 
 ns player {
   row = 0;
@@ -38,32 +77,23 @@ ns player {
   targetX = 0;
   targetY = gridSize;
   
-  frame = 0;
   lastAnimStart = 0;
   
-  show player = (cos(t) * cos(t) + x, cos(t) * sin(t) + y) @{ parametricDomain: @{ min: ds(-10), max: ds(10) } }
-  
-  fn lerp(a, b, time) {
-    (1 - time) * a + time * b
-  }
-  fn delta() {
-    mod((frame - lastAnimStart), 60) / 60
-  }
+  show player = (cos(t) * cos(t) + x + camera.cameraX, cos(t) * sin(t) + y + camera.cameraY) @{ parametricDomain: @{ min: ds(-10), max: ds(10) } }
   
   fn movePlayer() {
     targetX -> targetCol
       , targetY -> gridSize - targetRow - 0.5
-      , x -> lerp(x, targetX, delta())
-      , y -> lerp(y, targetY, delta())
+      , x -> global.lerp(x, targetX, global.delta(lastAnimStart, 60))
+      , y -> global.lerp(y, targetY, global.delta(lastAnimStart, 60))
       , row -> targetRow
       , col -> targetCol
-      , frame -> frame + 1
   }
 }
 
 ns controls {
   subst!(not, a, 1 - a);
-  subst!(anim, player.lastAnimStart -> player.frame);
+  subst!(anim, player.lastAnimStart -> global.frame);
   
   show (-1, -1) @{
     clickableInfo: @{
@@ -80,13 +110,17 @@ ns controls {
   show (-1.5, -1.5) @{
     clickableInfo: @{
       enabled: true,
-      latex: ds(player.targetCol -> player.targetCol - not!(checkLeft()) , anim!())
+      latex: ds(player.targetCol -> player.targetCol - not!(checkLeft())
+          , anim!()
+          , camera.startCamera())
     }
   }
   show (-0.5, -1.5) @{
     clickableInfo: @{
       enabled: true,
-      latex: ds(player.targetCol -> player.targetCol + not!(checkRight()) , anim!())
+      latex: ds(player.targetCol -> player.targetCol + not!(checkRight())
+          , anim!()
+          , camera.startCamera())
     }
   }
   
@@ -102,8 +136,6 @@ ns controls {
       walls.binary[(idx * 4)]
     ]
   } @{ hidden: true }
-  
-  subst!(diff, a, b, a - b);
   
   fn checkUp() {
     { player.row > 0: getCellWalls(getCellIndex(player.row, player.col))[4], 1 }
@@ -125,16 +157,23 @@ ns controls {
   }
 }
 
-subst!(param, x1, y1, x2, y2, ((1 - t) * x1 + t * x2, (1 - t) * y1 + t * y2));
+subst!(
+param,
+    x1,
+    y1,
+    x2,
+    y2,
+    ((1 - t) * x1 + t * x2 + camera.cameraX, (1 - t) * y1 + t * y2 + camera.cameraY)
+  );
 
 subst!(paramd, x1, y1, x2, y2, offsetX, offsetY, (
       cacheCos * ((1 - t) * x1 + t * x2)
       - cacheCos * ((1 - t) * y1 + t * y2)
-      + camera.x
+      + camera.cameraX
       + offsetX,
       cacheSin * ((1 - t) * x1 + t * x2)
       + cacheSin * ((1 - t) * y1 + t * y2)
-      + camera.y
+      + camera.cameraY
       + offsetY
       - 1
 ));
