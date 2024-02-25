@@ -112,15 +112,48 @@ export const createOptimizedMaze = () => {
     k++;
   }
 
-  // Painter's algorithm, very interesting, for this we need to use isometric coordinates
-  // https://en.wikipedia.org/wiki/Painter%27s_algorithm
-
-  const toIsometric = (x: number, y: number) => {
-    return {
-      x: x - y,
-      y: (x + y) / 2,
-    };
+  const areWallsIntersecting = (horizontal: WallGroup, vertical: WallGroup) => {
+    return (
+      // It's within the span of the horizontal wall
+      vertical.index > horizontal.start &&
+      vertical.index < horizontal.start + horizontal.length &&
+      // It passes through the index of the horizontal wall (can't be just adjacent, has to be passing through it)
+      vertical.start < horizontal.index &&
+      vertical.start + vertical.length > horizontal.index
+    );
   };
+
+  const horizontal = consolidatedWalls.filter((x) => x.type == "row");
+  const vertical = consolidatedWalls.filter((x) => x.type == "column");
+
+  // We cannot allow isometric walls to insersect each other, so we need to split columns that are intersected by rows
+  const intersectionPairs = vertical.flatMap((v) =>
+    horizontal
+      .filter((h) => areWallsIntersecting(h, v))
+      .map((h) => ({ horizontal: h, vertical: v }))
+  );
+
+  for (const { vertical, horizontal } of intersectionPairs) {
+    // Delete the original unsplit column
+    const index = consolidatedWalls.indexOf(vertical);
+    consolidatedWalls.splice(index, 1);
+
+    // Split the column into two new columns
+    const left = {
+      type: "column" as const,
+      index: vertical.index,
+      start: vertical.start,
+      length: horizontal.index - vertical.start,
+    };
+    const right = {
+      type: "column" as const,
+      index: vertical.index,
+      start: horizontal.index,
+      length: vertical.start + vertical.length - horizontal.index,
+    };
+
+    consolidatedWalls.push(left, right);
+  }
 
   // Sort all of the rows and columns by the "highest" isometric points first
   // This is to ensure that the walls are drawn in the correct order
