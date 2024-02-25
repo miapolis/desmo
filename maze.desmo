@@ -88,8 +88,8 @@ ns player {
       , targetY -> gridSize - targetRow - 0.5
       , x -> global.lerp(x, targetX, global.delta(lastAnimStart, 60))
       , y -> global.lerp(y, targetY, global.delta(lastAnimStart, 60))
-      , row -> targetRow
-      , col -> targetCol
+      , row -> round(global.lerp(row, targetRow, global.delta(lastAnimStart, 30)))
+      , col -> round(global.lerp(col, targetCol, global.delta(lastAnimStart, 30)))
   }
 }
 
@@ -194,31 +194,6 @@ colIndex,
   binary = maze!();
   polyData = polygonData!();
   lineData = parametricData!();
-  
-  subst!(
-bounds,
-      index,
-      { index > 0: { index <= (gridSize * gridSize): index, 0 }, 0 }
-    );
-  
-  "index, allowTop, allowRight"
-  coveringIndices = [
-    bounds!(player.respectiveIndex - gridSize - 1),
-    0,
-    1,
-    bounds!(player.respectiveIndex - 1),
-    0,
-    1,
-    bounds!(player.respectiveIndex + gridSize - 1),
-    1,
-    1,
-    bounds!(player.respectiveIndex + gridSize),
-    1,
-    0,
-    bounds!(player.respectiveIndex + gridSize + 1),
-    1,
-    0
-  ];
 }
 
 ns renderer {
@@ -277,12 +252,37 @@ parametricCol,
     show backRow = wall!(0, gridSize, gridSize, gridSize) @{ color: "rgb( 31, 41, 55 )", fillOpacity: "1" }
     show backCol = wall!(gridSize, 0, gridSize, gridSize) @{ color: "rgb( 55, 65, 81 )", fillOpacity: "1" }
     
-    show polygons = [{
-        walls.polyData[(i * 3 - 2)] == 0: polygonRow!(walls.polyData[(i * 3 - 1)], walls.polyData[(i * 3)]),
-        polygonCol!(walls.polyData[(i * 3 - 1)], walls.polyData[(i * 3)])
-      } for
-      i=[1..length!(walls.polyData) / 3]
-    ] @{ color: "rgb(245,13,10)", fillOpacity: "1", colorLatex: ds(colorLatex) }
+    subst!(type, i, walls.polyData[(i * 3 - 2)]);
+    subst!(index, i, walls.polyData[(i * 3 - 1)]);
+    subst!(start, i, walls.polyData[(i * 3)]);
+    
+    subst!(
+debouncedRow,
+        { player.targetRow > player.row: player.targetRow, player.row }
+      );
+    subst!(
+debouncedCol,
+        { player.targetCol < player.col: player.targetCol, player.col }
+      );    
+    
+    fn getRearPolygon(i) {
+      {
+        type!(i) == 0: {
+          (bool!(index!(i) <= debouncedRow!()) * bool!(start!(i) >= debouncedCol!())) == 1: polygonRow!(index!(i), start!(i))
+        },
+        (bool!(index!(i) > debouncedCol!()) * bool!(start!(i) <= debouncedRow!())) == 1: polygonCol!(index!(i), start!(i))
+      }
+    }
+    fn getFrontPolygon(i) {
+      {
+        type!(i) == 0: {
+          (bool!(index!(i) <= debouncedRow!()) * bool!(start!(i) >= debouncedCol!())) == 0: polygonRow!(index!(i), start!(i))
+        },
+        (bool!(index!(i) > debouncedCol!()) * bool!(start!(i) <= debouncedRow!())) == 0: polygonCol!(index!(i), start!(i))
+      }
+    }
+    
+    show rearPolygons = [getRearPolygon(i) for i=[1..length!(walls.polyData) / 3]] @{  fillOpacity: "1", colorLatex: ds(colorLatex) }
     
     ns character {
       show circle1 = (
@@ -314,29 +314,7 @@ parametricCol,
       }
     }
     
-    fn cov(j) {
-      walls.coveringIndices[(j * 3 - 2)]
-    }
-    fn allowTop(j) {
-      walls.coveringIndices[(j * 3 - 1)]
-    }
-    fn allowRight(j) {
-      walls.coveringIndices[(j * 3)]
-    }
-    
-    fn showTopWalls(j) {
-      {
-        (allowTop(j) * walls.binary[cov(j) * 4]) == 1: polygonRow!(floor(cov(j) / gridSize), mod(cov(j), gridSize) - 1)
-      }
-    }
-    fn showRightWalls(j) {
-      {
-        (allowRight(j) * walls.binary[cov(j) * 4 - 1]) == 1: polygonCol!(mod(cov(j), gridSize), floor(cov(j) / gridSize))
-      }
-    }
-    
-    show coveringWallsTop = [showTopWalls(i) for i=[1..5]] @{ color: "rgb( 31, 41, 55 )", fillOpacity: "1" }
-    show coveringWallsRight = [showRightWalls(i) for i=[1..5]] @{ color: "rgb( 55, 65, 81 )", fillOpacity: "1" }
+    show frontPolygons = [getFrontPolygon(i) for i=[1..length!(walls.polyData) / 3]] @{  fillOpacity: "1", colorLatex: ds(colorLatex) }
     
     show parametrics = [{
         walls.lineData[(i * 4 - 3)] == 0: parametricRow!(
