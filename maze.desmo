@@ -282,39 +282,40 @@ debouncedCol,
       }
     }
     
-    show rearPolygons = [getRearPolygon(i) for i=[1..length!(walls.polyData) / 3]] @{  fillOpacity: "1", colorLatex: ds(colorLatex) }
+    show rearPolygons = [getRearPolygon(i) for i=[1..length!(walls.polyData) / 3]] @{  fillOpacity: "1", colorLatex: ds(colorLatex), lines: false }
     
     ns character {
-      show circle1 = (
-          cacheCos * (cos(t) * cos(t) * 0.8 + player.x)
-          - cacheCos * (cos(t) * sin(t) * 0.8 + player.y)
+      subst!(circle, offset, size,
+          (cacheCos * (cos(t) * cos(t) * size + player.x + (1 - size) / 2)
+          - cacheCos * (cos(t) * sin(t) * size + player.y)
           + camera.cameraX,
-          cacheSin * (cos(t) * cos(t) * 0.8 + player.x)
-          + cacheSin * (cos(t) * sin(t) * 0.8 + player.y)
+          cacheSin * (cos(t) * cos(t) * size + player.x)
+          + cacheSin * (cos(t) * sin(t) * size + player.y)
           + camera.cameraY
-          - 1
-) @{
-        parametricDomain: @{ min: ds(0), max: ds(tau!()) },
-        color: "red",
-        lineWidth: "5"
+          - 1 - offset)
+      );
+
+      show circle3 = circle!(gridOffset - 0.1, 0.4) @{
+       parametricDomain: @{ min: ds(0), max: ds(tau!()) },
+        color: "rgb(245, 158, 11)",
+        lineWidth: "5",
+        lineOpacity: "0.5"
       }
-      
-      show circle2 = (
-          cacheCos * (cos(t) * cos(t) * 0.8 + player.x)
-          - cacheCos * (cos(t) * sin(t) * 0.8 + player.y)
-          + camera.cameraX,
-          cacheSin * (cos(t) * cos(t) * 0.8 + player.x)
-          + cacheSin * (cos(t) * sin(t) * 0.8 + player.y)
-          + camera.cameraY
-          - 1.75
-) @{
+      show circle2 = circle!((gridOffset - 0.1) / 2, 0.6) @{
+       parametricDomain: @{ min: ds(0), max: ds(tau!()) },
+        color: "rgb(249, 115, 22)",
+        lineWidth: "5",
+        lineOpacity: "0.75"
+      }
+      show circle1 = circle!(0, 0.8) @{
         parametricDomain: @{ min: ds(0), max: ds(tau!()) },
-        color: "red",
-        lineWidth: "5"
+        color: "rgb(239, 68, 68)",
+        lineWidth: "5",
+        lineOpacity: "1"
       }
     }
     
-    show frontPolygons = [getFrontPolygon(i) for i=[1..length!(walls.polyData) / 3]] @{  fillOpacity: "1", colorLatex: ds(colorLatex) }
+    show frontPolygons = [getFrontPolygon(i) for i=[1..length!(walls.polyData) / 3]] @{ fillOpacity: "1", colorLatex: ds(colorLatex), lines: false }
     
     show parametrics = [{
         walls.lineData[(i * 4 - 3)] == 0: parametricRow!(
