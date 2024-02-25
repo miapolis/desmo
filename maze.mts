@@ -33,7 +33,7 @@ export default function ({ addMacro, addLatexMacro }) {
     name: "length",
     fn: (node, a: MacroAPI) => {
       return `\\operatorname{length}\\left(${unstable_parseIdent(
-        node.params[0].segments[0]
+        node.params[0].segments[1]
       )}\\right)`;
     },
   });

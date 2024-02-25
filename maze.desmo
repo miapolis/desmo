@@ -70,6 +70,8 @@ ns player {
   row = 0;
   col = 0;
   
+  respectiveIndex = row * gridSize + col + 1;
+  
   x = col;
   y = gridSize - row;
   
@@ -171,7 +173,6 @@ xy!(x1, y1),
     ));
 
 ns walls {
-  
   subst!(shiftRow, rowIndex, startCol, length, paramd!(
 startCol,
         gridSize - rowIndex,
@@ -191,7 +192,33 @@ colIndex,
       ));
   
   binary = maze!();
-  "[type, index, start, ...]"
+  polyData = polygonData!();
+  lineData = parametricData!();
+  
+  subst!(
+bounds,
+      index,
+      { index > 0: { index <= (gridSize * gridSize): index, 0 }, 0 }
+    );
+  
+  "index, allowTop, allowRight"
+  coveringIndices = [
+    bounds!(player.respectiveIndex - gridSize - 1),
+    0,
+    1,
+    bounds!(player.respectiveIndex - 1),
+    0,
+    1,
+    bounds!(player.respectiveIndex + gridSize - 1),
+    1,
+    1,
+    bounds!(player.respectiveIndex + gridSize),
+    1,
+    0,
+    bounds!(player.respectiveIndex + gridSize + 1),
+    1,
+    0
+  ];
 }
 
 ns renderer {
@@ -208,7 +235,7 @@ shiftXy!(0, 0, gridOffset),
       ) @{ colorLatex: ds(rgb(17, 24, 39)), fillOpacity: ds(1) }
   }
   
-  ns walls {
+  ns obstacles {
     subst!(
 polygonRow,
         rowIndex,
@@ -239,10 +266,7 @@ parametricCol,
         param!(colIndex, gridSize - startRow, colIndex, gridSize - startRow - length)
       );
     
-    data = polygonData!();
-    lines = parametricData!();
-    
-    wallTypes = [data[(i * 3 - 2)] for i=[1..length!(data) / 3]];
+    wallTypes = [walls.polyData[(i * 3 - 2)] for i=[1..length!(walls.polyData) / 3]];
     "rgb( 31, 41, 55 )"
     "rgb( 55, 65, 81 )"
     colorR = [{ i == 0: 31, 55 } for i=wallTypes];
@@ -254,9 +278,11 @@ parametricCol,
     show backCol = wall!(gridSize, 0, gridSize, gridSize) @{ color: "rgb( 55, 65, 81 )", fillOpacity: "1" }
     
     show polygons = [{
-        data[(i * 3 - 2)] == 0: polygonRow!(data[(i * 3 - 1)], data[(i * 3)]),
-        polygonCol!(data[(i * 3 - 1)], data[(i * 3)])
-      } for i=[1..length!(data) / 3]] @{ color: "rgb(245,13,10)", fillOpacity: "1", colorLatex: ds(colorLatex) }
+        walls.polyData[(i * 3 - 2)] == 0: polygonRow!(walls.polyData[(i * 3 - 1)], walls.polyData[(i * 3)]),
+        polygonCol!(walls.polyData[(i * 3 - 1)], walls.polyData[(i * 3)])
+      } for
+      i=[1..length!(walls.polyData) / 3]
+    ] @{ color: "rgb(245,13,10)", fillOpacity: "1", colorLatex: ds(colorLatex) }
     
     ns character {
       show circle1 = (
@@ -288,12 +314,42 @@ parametricCol,
       }
     }
     
+    fn cov(j) {
+      walls.coveringIndices[(j * 3 - 2)]
+    }
+    fn allowTop(j) {
+      walls.coveringIndices[(j * 3 - 1)]
+    }
+    fn allowRight(j) {
+      walls.coveringIndices[(j * 3)]
+    }
+    
+    fn showTopWalls(j) {
+      {
+        (allowTop(j) * walls.binary[cov(j) * 4]) == 1: polygonRow!(floor(cov(j) / gridSize), mod(cov(j), gridSize) - 1)
+      }
+    }
+    fn showRightWalls(j) {
+      {
+        (allowRight(j) * walls.binary[cov(j) * 4 - 1]) == 1: polygonCol!(mod(cov(j), gridSize), floor(cov(j) / gridSize))
+      }
+    }
+    
+    show coveringWallsTop = [showTopWalls(i) for i=[1..5]] @{ color: "rgb( 31, 41, 55 )", fillOpacity: "1" }
+    show coveringWallsRight = [showRightWalls(i) for i=[1..5]] @{ color: "rgb( 55, 65, 81 )", fillOpacity: "1" }
+    
     show parametrics = [{
-        lines[(i * 4 - 3)] == 0: parametricRow!(lines[(i * 4 - 2)], lines[(i * 4 - 1)], lines[(i * 4)]),
-        parametricCol!(lines[(i * 4 - 2)], lines[(i * 4 - 1)], lines[(i * 4)])
-      } for
-      i=[1..length!(lines) / 4]
-    ] @{ color: "rgb(209, 213, 219)", fillOpacity: "1", lineWidth: "5" }
+        walls.lineData[(i * 4 - 3)] == 0: parametricRow!(
+walls.lineData[(i * 4 - 2)],
+            walls.lineData[(i * 4 - 1)],
+            walls.lineData[(i * 4)]
+          ),
+        parametricCol!(
+walls.lineData[(i * 4 - 2)],
+            walls.lineData[(i * 4 - 1)],
+            walls.lineData[(i * 4)]
+          )
+      } for i=[1..length!(walls.lineData) / 4]] @{ color: "rgb(209, 213, 219)", fillOpacity: "1", lineWidth: "5" }
   }
   
   show frontRow = wall!(0, 0, gridSize, 0) @{ color: "rgb( 31, 41, 55 )", fillOpacity: "1" }
