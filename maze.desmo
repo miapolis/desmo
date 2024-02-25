@@ -19,13 +19,17 @@ cacheCos = cos(proj / 6);
 cacheSin = sin(proj / 6);
 
 subst!(diff, a, b, a - b);
+subst!(sum, a, b, a + b);
 subst!(bool, v, { v: 1, 0 });
 subst!(not, a, 1 - a);
 
 ticker @{ handlerLatex: ds(gameLoopLatex!()), playing: true, open: true }
 
 fn gameLoop(delta) {
-  player.movePlayer() , camera.adjustCameraToPlayer() , global.tick(delta)
+  player.movePlayer()
+    , camera.adjustCameraToPlayer()
+    , { global.frame < 130: controller.playAnim() }
+    , global.tick(delta)
 }
 
 ns global {
@@ -46,7 +50,7 @@ ns global {
 
 ns camera {
   cameraX = 0;
-  cameraY = 0;
+  cameraY = 4;
   
   targetX = 0;
   targetY = 0;
@@ -156,6 +160,10 @@ subst!(paramd, x1, y1, x2, y2, offsetX, offsetY, (
       - 1
 ));
 
+subst!(iso, xVar, yVar, yOffset, (
+      cacheCos * xVar - cacheCos * yVar,
+      cacheSin * xVar + cacheSin * yVar - 1 - yOffset
+));
 subst!(xy, xVar, yVar, (
       cacheCos * xVar - cacheCos * yVar + camera.cameraX,
       cacheSin * xVar + cacheSin * yVar + camera.cameraY - 1
@@ -263,7 +271,7 @@ debouncedRow,
     subst!(
 debouncedCol,
         { player.targetCol < player.col: player.targetCol, player.col }
-      );    
+      );
     
     fn getRearPolygon(i) {
       {
@@ -282,27 +290,28 @@ debouncedCol,
       }
     }
     
-    show rearPolygons = [getRearPolygon(i) for i=[1..length!(walls.polyData) / 3]] @{  fillOpacity: "1", colorLatex: ds(colorLatex), lines: false }
+    show rearPolygons = [getRearPolygon(i) for i=[1..length!(walls.polyData) / 3]] @{ fillOpacity: "1", colorLatex: ds(colorLatex), lines: false }
     
     ns character {
-      subst!(circle, offset, size,
-          (cacheCos * (cos(t) * cos(t) * size + player.x + (1 - size) / 2)
-          - cacheCos * (cos(t) * sin(t) * size + player.y)
-          + camera.cameraX,
-          cacheSin * (cos(t) * cos(t) * size + player.x)
-          + cacheSin * (cos(t) * sin(t) * size + player.y)
-          + camera.cameraY
-          - 1 - offset)
-      );
-
+      subst!(circle, offset, size, (
+            cacheCos * (cos(t) * cos(t) * size + player.x + (1 - size) / 2)
+            - cacheCos * (cos(t) * sin(t) * size + player.y)
+            + camera.cameraX,
+            cacheSin * (cos(t) * cos(t) * size + player.x)
+            + cacheSin * (cos(t) * sin(t) * size + player.y)
+            + camera.cameraY
+            - 1
+            - offset
+));
+      
       show circle3 = circle!(gridOffset - 0.1, 0.4) @{
-       parametricDomain: @{ min: ds(0), max: ds(tau!()) },
+        parametricDomain: @{ min: ds(0), max: ds(tau!()) },
         color: "rgb(245, 158, 11)",
         lineWidth: "5",
         lineOpacity: "0.5"
       }
       show circle2 = circle!((gridOffset - 0.1) / 2, 0.6) @{
-       parametricDomain: @{ min: ds(0), max: ds(tau!()) },
+        parametricDomain: @{ min: ds(0), max: ds(tau!()) },
         color: "rgb(249, 115, 22)",
         lineWidth: "5",
         lineOpacity: "0.75"
@@ -340,45 +349,127 @@ walls.lineData[(i * 4 - 2)],
     
     show [param!(p!(i, 3), p!(i, 2), p!(i, 1), p!(i, 0)) for i=[1..16]] @{ color: "rgb(209,213,219)", fillOpacity: "1", lineWidth: "5" }
   }
-  
-  ns controller {
-    show (-1, -1) @{
+}
+
+ns controller {
+    fn xRotate(x, y, angle) {
+      x * cos(angle) - y * sin(angle)
+    }
+    fn yRotate(x, y, angle) {
+      x * sin(angle) + y * cos(angle)
+    }
+    
+    buttonWidth = 0.5;
+    buttonScale = 1.5;
+    buttonHeight = 1.5;
+    buttonDistance = 0.5;
+    
+    show verts = [
+      (0, 0),
+      (buttonWidth, 0.5),
+      (buttonWidth, buttonHeight),
+      (-1 * buttonWidth, buttonHeight),
+      (-1 * buttonWidth, 0.5)
+    ] @{ hidden: true }
+    
+    subst!(
+rX,
+        angle,
+        xRotate(verts.x * buttonScale, verts.y * buttonScale + buttonDistance, angle)
+      );
+    subst!(
+rY,
+        angle,
+        yRotate(verts.x * buttonScale, verts.y * buttonScale + buttonDistance, angle)
+      );
+    
+    subst!(
+button,
+        angle,
+        animOffset,
+        polygon(iso!(rX!(angle), rY!(angle), animOffset))
+      );
+    
+    topOffset = 2;
+    bottomOffset = 2;
+    rightOffset = 2;
+    leftOffset = 2;
+
+    upEnabled = not!(controls.checkUp());
+    downEnabled = not!(controls.checkDown());
+    rightEnabled = not!(controls.checkRight());
+    leftEnabled = not!(controls.checkLeft());
+    
+    fn mix(a, b, factor) {
+      show clampedFactor = min(max(factor, 0), 1) @{ hidden: true }
+      b * clampedFactor + a * (1 - clampedFactor)
+    }
+
+    show fn easeInOutCubic(t) {
+      { t < 0.5: 4 * t * t * t, 1 - (-2 * t + 2)^3 / 2}
+    } @{ hidden: true }
+     
+    fn smoothstepMix(a, b, factor) {
+      mix(a, b, factor * factor * (3 - factor * 2))
+    }
+
+    fn easeOutMix(a, b, factor) {
+      mix(a, b, easeInOutCubic(factor))
+    }
+
+    subst!(delay, expr, frames, duration, { global.frame > frames: { global.frame < sum!(frames, duration): expr } });
+    
+    fn playAnim() {
+      rightOffset -> delay!(easeOutMix(2, 0, global.delta(0, 100)), 0, 100),
+      topOffset -> delay!(easeOutMix(2, 0, global.delta(10, 100)), 10, 100),
+      leftOffset -> delay!(easeOutMix(2, 0, global.delta(20, 100)), 20, 100),
+      bottomOffset -> delay!(easeOutMix(2, 0, global.delta(30, 100)), 30, 100)
+    }
+    
+    show button!(0, topOffset) @{
       clickableInfo: @{
         enabled: true,
-        latex: ds(player.targetRow -> player.targetRow - not!(controls.checkUp())
+        latex: ds(player.targetRow -> player.targetRow - upEnabled
             , controls.anim!())
       },
+      lineOpacity: ds((2 - topOffset) / 2 * upEnabled),
+      fillOpacity: ds((2 - topOffset) / 2 * 0.4),
       lineWidth: "5",
       color: "red"
     }
-    show (-1, -2) @{
+    show button!(3.1416, bottomOffset) @{
       clickableInfo: @{
         enabled: true,
-        latex: ds(player.targetRow -> player.targetRow + not!(controls.checkDown())
+        latex: ds(player.targetRow -> player.targetRow + downEnabled
             , controls.anim!())
       },
+      lineOpacity: ds((2 - bottomOffset) / 2 * downEnabled),
+      fillOpacity: ds((2 - bottomOffset) / 2 * 0.4),
       lineWidth: "5",
       color: "red"
     }
-    show (-1.5, -1.5) @{
+    show button!(4.7124, rightOffset) @{
       clickableInfo: @{
         enabled: true,
-        latex: ds(player.targetCol -> player.targetCol - not!(controls.checkLeft())
+        latex: ds(player.targetCol -> player.targetCol + rightEnabled
             , controls.anim!()
             , camera.startCamera())
       },
+      lineOpacity: ds((2 - rightOffset) / 2 * rightEnabled),
+      fillOpacity: ds((2 - rightOffset) / 2 * 0.4),
       lineWidth: "5",
       color: "red"
     }
-    show (-0.5, -1.5) @{
+    show button!(1.5708, leftOffset) @{
       clickableInfo: @{
         enabled: true,
-        latex: ds(player.targetCol -> player.targetCol + not!(controls.checkRight())
+        latex: ds(player.targetCol -> player.targetCol - leftEnabled
             , controls.anim!()
             , camera.startCamera())
       },
+      lineOpacity: ds((2 - leftOffset) / 2 * leftEnabled),
+      fillOpacity: ds((2 - leftOffset) / 2 * 0.4),
       lineWidth: "5",
       color: "red"
     }
   }
-}
