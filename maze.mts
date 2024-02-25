@@ -1,7 +1,7 @@
 import type { MacroAPI } from "desmoscript/dist/macro/macro-api";
 
 export default function ({ addMacro, addLatexMacro }) {
-  const { cells, walls } = createOptimizedMaze();
+  const { cells, polygons, parametrics } = createOptimizedMaze();
 
   addMacro({
     name: "maze",
@@ -12,9 +12,16 @@ export default function ({ addMacro, addLatexMacro }) {
   });
 
   addMacro({
-    name: "wallData",
+    name: "polygonData",
     fn: (node, a) => {
-      return a.parseExpr(`[${walls.join(",")}]`);
+      return a.parseExpr(`[${polygons.join(",")}]`);
+    },
+  });
+
+  addMacro({
+    name: "parametricData",
+    fn: (node, a) => {
+      return a.parseExpr(`[${parametrics.join(",")}]`);
     },
   });
 
@@ -114,13 +121,13 @@ export const createOptimizedMaze = () => {
   }
 
   // Split every wall into one-cell wide walls
-  const newConsolidatedWalls = new Array<WallGroup>();
+  const polygonTiles = new Array<WallGroup>();
   for (const wall of consolidatedWalls) {
     if (wall.length === 1) {
-      newConsolidatedWalls.push(wall);
+      polygonTiles.push(wall);
     } else {
       for (let j = 0; j < wall.length; j++) {
-        newConsolidatedWalls.push({
+        polygonTiles.push({
           type: wall.type,
           index: wall.index,
           start: wall.start + j,
@@ -143,13 +150,16 @@ export const createOptimizedMaze = () => {
     }
   };
 
-  newConsolidatedWalls.sort((a, b) => getOrderEval(b) - getOrderEval(a));
+  polygonTiles.sort((a, b) => getOrderEval(b) - getOrderEval(a));
 
-  const flattened = newConsolidatedWalls
+  const polygons = polygonTiles
     .map((w) => [w.type == "row" ? 0 : 1, w.index, w.start])
     .flat();
+  const parametrics = consolidatedWalls
+    .map((w) => [w.type == "row" ? 0 : 1, w.index, w.start, w.length])
+    .flat();
 
-  return { cells, walls: flattened };
+  return { cells, polygons, parametrics };
 };
 
 export const generateMaze = (
