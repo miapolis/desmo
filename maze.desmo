@@ -263,16 +263,15 @@ colIndex,
   
   binary = maze!();
   "[rowIndex, startCol, length, rowIndex, startCol, length, ...]"
-  rows = consolidateRows!();
-  cols = consolidateCols!();
+  data = wallData!();
   
-  len = gridSize * gridSize * 4;
+  wallTypes = [data[(i * 4 - 3)] * 80 + i * 3.5 for i=[1..length!(data) / 4]];
+  colorLatex = rgb(wallTypes, 0, 0);
   
-  show R = [drawRow!(rows[(i * 3 - 2)], rows[(i * 3 - 1)], rows[(i * 3)]) for
-    i=[1..length!(rows)]
-  ] @{ color: "rgb(245,13,10)", fillOpacity: "1" }
-  
-  show C = [drawCol!(cols[(i * 3 - 2)], cols[(i * 3 - 1)], cols[(i * 3)]) for
-    i=[1..length!(cols)]
-  ] @{ color: "rgb(68,13,75)", fillOpacity: "1" }
+  show C = [{
+      data[(i * 4 - 3)] == 0: drawRow!(data[(i * 4 - 2)], data[(i * 4 - 1)], data[(i * 4)]),
+      drawCol!(data[(i * 4 - 2)], data[(i * 4 - 1)], data[(i * 4)])
+    } for
+    i=[1..length!(data) / 4]
+  ] @{ color: "rgb(245,13,10)", fillOpacity: "1", colorLatex: ds(colorLatex) }
 }

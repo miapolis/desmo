@@ -1,7 +1,7 @@
 import type { MacroAPI } from "desmoscript/dist/macro/macro-api";
 
 export default function ({ addMacro, addLatexMacro }) {
-  const { cells, consolidatedRows, consolidatedCols } = createOptimizedMaze();
+  const { cells, walls } = createOptimizedMaze();
 
   addMacro({
     name: "maze",
@@ -12,16 +12,9 @@ export default function ({ addMacro, addLatexMacro }) {
   });
 
   addMacro({
-    name: "consolidateRows",
+    name: "wallData",
     fn: (node, a) => {
-      return a.parseExpr(`[${consolidatedRows.join(",")}]`);
-    },
-  });
-
-  addMacro({
-    name: "consolidateCols",
-    fn: (node, a) => {
-      return a.parseExpr(`[${consolidatedCols.join(",")}]`);
+      return a.parseExpr(`[${walls.join(",")}]`);
     },
   });
 
@@ -74,16 +67,32 @@ export const createOptimizedMaze = () => {
   }
 
   // Consolidate walls by first going row by row then column by column
-  // Syntax [rowIndex, startCol, length, rowIndex, startCol, length, ...]
+  // Syntax [type (0 = row, 1 = column), rowIndex, startCol, length, 0, rowIndex, startCol, length, ...]
   const consolidatedRows = new Array<number>();
+  // [1, colIndex, startRow, length, 1, colIndex, startRow, length, ...]
   const consolidatedCols = new Array<number>();
+
+  interface WallGroup {
+    type: "row" | "column";
+    index: number;
+    start: number;
+    length: number;
+    depth?: number;
+  }
+
+  const consolidatedWalls = new Array<WallGroup>();
 
   // .entries() seems to be broken for the macros compiler target, use a manual index instead
   let i = 0;
   for (const cells of rows) {
     const transformed = groupConsecutives(cells.map((cell) => cell.walls[1]));
-    consolidatedRows.push(
-      ...transformed.map((group) => [i + 1, group.index, group.length]).flat()
+    consolidatedWalls.push(
+      ...transformed.map((group) => ({
+        type: "row" as const,
+        index: i + 1,
+        start: group.index,
+        length: group.length,
+      }))
     );
     i++;
   }
@@ -92,13 +101,46 @@ export const createOptimizedMaze = () => {
   for (const cells of columns) {
     // Get the right walls of all the cells
     const transformed = groupConsecutives(cells.map((cell) => cell.walls[0]));
-    consolidatedCols.push(
-      ...transformed.map((group) => [k, group.index, group.length]).flat()
+    consolidatedWalls.push(
+      ...transformed.map((group) => ({
+        type: "column" as const,
+        index: k,
+        start: group.index,
+        length: group.length,
+      }))
     );
     k++;
   }
 
-  return { cells, consolidatedRows, consolidatedCols };
+  // Painter's algorithm, very interesting, for this we need to use isometric coordinates
+  // https://en.wikipedia.org/wiki/Painter%27s_algorithm
+
+  const toIsometric = (x: number, y: number) => {
+    return {
+      x: x - y,
+      y: (x + y) / 2,
+    };
+  };
+
+  // Sort all of the rows and columns by the "highest" isometric points first
+  // This is to ensure that the walls are drawn in the correct order
+  const getOrderEval = (w: WallGroup) => {
+    if (w.type == "row") {
+      // If it's a row, the "highest" point is a low row index and a high start + length value
+      return -1 * w.index + w.start + w.length;
+    } else {
+      // For a column the "highest" point is a high column index and a low start value
+      return w.index - w.start;
+    }
+  };
+
+  consolidatedWalls.sort((a, b) => getOrderEval(b) - getOrderEval(a));
+
+  const flattened = consolidatedWalls
+    .map((w) => [w.type == "row" ? 0 : 1, w.index, w.start, w.length])
+    .flat();
+
+  return { cells, walls: flattened };
 };
 
 export const generateMaze = (
