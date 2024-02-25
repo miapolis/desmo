@@ -18,18 +18,49 @@ gray = rgb(200, 200, 200);
 cacheCos = cos(proj / 6);
 cacheSin = sin(proj / 6);
 
-subst!(diff, a, b, a - b);
 subst!(sum, a, b, a + b);
+subst!(diff, a, b, a - b);
 subst!(bool, v, { v: 1, 0 });
 subst!(not, a, 1 - a);
+
+subst!(
+anim,
+    expr,
+    frames,
+    duration,
+    { global.frame > frames: { global.frame < sum!(frames, duration): expr } }
+  );
+
+fn mix(a, b, factor) {
+  show clampedFactor = min(max(factor, 0), 1) @{ hidden: true }
+  b * clampedFactor + a * (1 - clampedFactor)
+}
+
+show fn easeInOutCubic(t) {
+  { t < 0.5: 4 * t * t * t, 1 - (-2 * t + 2) ^ 3 / 2 }
+} @{ hidden: true }
+
+fn smoothstepMix(a, b, factor) {
+  mix(a, b, factor * factor * (3 - factor * 2))
+}
+fn easeOutMix(a, b, factor) {
+  mix(a, b, easeInOutCubic(factor))
+}
 
 ticker @{ handlerLatex: ds(gameLoopLatex!()), playing: true, open: true }
 
 fn gameLoop(delta) {
-  player.movePlayer()
-    , camera.adjustCameraToPlayer()
+  {
+    state.hasWon == 1: {
+      state.levelEndFrame > 0: { 
+          global.frame > (state.levelEndFrame + 70): (player.reset(), camera.reset(), state.hasWon -> 0, state.levelEndFrame -> 0, state.levelStartFrame -> global.frame),
+          screen.doFade() 
+      },
+    },
+    (player.movePlayer(), camera.adjustCameraToPlayer(), state.checkWin(), { state.levelStartFrame > 0: { global.frame < (state.levelStartFrame + 50): screen.fadeIn() }}),
+  }
     , { global.frame < 130: controller.playAnim() }
-    , global.tick(delta)
+    ,  global.tick(delta)
 }
 
 ns global {
@@ -63,10 +94,12 @@ ns camera {
   fn startCamera() {
     lastAnimStart -> { movingX!() > 0: lastAnimStart, global.frame }
   }
-  
   fn adjustCameraToPlayer() {
     targetX -> -1 * player.x
       , cameraX -> global.lerp(cameraX, targetX, global.delta(lastAnimStart, 4000))
+  }
+  fn reset() {
+    cameraX -> 0 , cameraY -> 4
   }
 }
 
@@ -94,6 +127,10 @@ ns player {
       , y -> global.lerp(y, targetY, global.delta(lastAnimStart, 60))
       , row -> round(global.lerp(row, targetRow, global.delta(lastAnimStart, 30)))
       , col -> round(global.lerp(col, targetCol, global.delta(lastAnimStart, 30)))
+  }
+  
+  fn reset() {
+    row -> 0 , col -> 0 , targetRow -> 0 , targetCol -> 0 , x -> 0 , y -> gridSize
   }
 }
 
@@ -351,125 +388,131 @@ walls.lineData[(i * 4 - 2)],
   }
 }
 
-ns controller {
-    fn xRotate(x, y, angle) {
-      x * cos(angle) - y * sin(angle)
-    }
-    fn yRotate(x, y, angle) {
-      x * sin(angle) + y * cos(angle)
-    }
-    
-    buttonWidth = 0.5;
-    buttonScale = 1.5;
-    buttonHeight = 1.5;
-    buttonDistance = 0.5;
-    
-    show verts = [
-      (0, 0),
-      (buttonWidth, 0.5),
-      (buttonWidth, buttonHeight),
-      (-1 * buttonWidth, buttonHeight),
-      (-1 * buttonWidth, 0.5)
-    ] @{ hidden: true }
-    
-    subst!(
-rX,
-        angle,
-        xRotate(verts.x * buttonScale, verts.y * buttonScale + buttonDistance, angle)
-      );
-    subst!(
-rY,
-        angle,
-        yRotate(verts.x * buttonScale, verts.y * buttonScale + buttonDistance, angle)
-      );
-    
-    subst!(
-button,
-        angle,
-        animOffset,
-        polygon(iso!(rX!(angle), rY!(angle), animOffset))
-      );
-    
-    topOffset = 2;
-    bottomOffset = 2;
-    rightOffset = 2;
-    leftOffset = 2;
+ns state {
+  last = gridSize - 1;
+  won = { player.row == last: { player.col == last: 1, 0 } };
 
-    upEnabled = not!(controls.checkUp());
-    downEnabled = not!(controls.checkDown());
-    rightEnabled = not!(controls.checkRight());
-    leftEnabled = not!(controls.checkLeft());
-    
-    fn mix(a, b, factor) {
-      show clampedFactor = min(max(factor, 0), 1) @{ hidden: true }
-      b * clampedFactor + a * (1 - clampedFactor)
-    }
+  hasWon = 0;
+  levelStartFrame = 0;
+  levelEndFrame = 0;
 
-    show fn easeInOutCubic(t) {
-      { t < 0.5: 4 * t * t * t, 1 - (-2 * t + 2)^3 / 2}
-    } @{ hidden: true }
-     
-    fn smoothstepMix(a, b, factor) {
-      mix(a, b, factor * factor * (3 - factor * 2))
-    }
-
-    fn easeOutMix(a, b, factor) {
-      mix(a, b, easeInOutCubic(factor))
-    }
-
-    subst!(delay, expr, frames, duration, { global.frame > frames: { global.frame < sum!(frames, duration): expr } });
-    
-    fn playAnim() {
-      rightOffset -> delay!(easeOutMix(2, 0, global.delta(0, 100)), 0, 100),
-      topOffset -> delay!(easeOutMix(2, 0, global.delta(10, 100)), 10, 100),
-      leftOffset -> delay!(easeOutMix(2, 0, global.delta(20, 100)), 20, 100),
-      bottomOffset -> delay!(easeOutMix(2, 0, global.delta(30, 100)), 30, 100)
-    }
-    
-    show button!(0, topOffset) @{
-      clickableInfo: @{
-        enabled: true,
-        latex: ds(player.targetRow -> player.targetRow - upEnabled
-            , controls.anim!())
-      },
-      lineOpacity: ds((2 - topOffset) / 2 * upEnabled),
-      fillOpacity: ds((2 - topOffset) / 2 * 0.4),
-      lineWidth: "5",
-      color: "red"
-    }
-    show button!(3.1416, bottomOffset) @{
-      clickableInfo: @{
-        enabled: true,
-        latex: ds(player.targetRow -> player.targetRow + downEnabled
-            , controls.anim!())
-      },
-      lineOpacity: ds((2 - bottomOffset) / 2 * downEnabled),
-      fillOpacity: ds((2 - bottomOffset) / 2 * 0.4),
-      lineWidth: "5",
-      color: "red"
-    }
-    show button!(4.7124, rightOffset) @{
-      clickableInfo: @{
-        enabled: true,
-        latex: ds(player.targetCol -> player.targetCol + rightEnabled
-            , controls.anim!()
-            , camera.startCamera())
-      },
-      lineOpacity: ds((2 - rightOffset) / 2 * rightEnabled),
-      fillOpacity: ds((2 - rightOffset) / 2 * 0.4),
-      lineWidth: "5",
-      color: "red"
-    }
-    show button!(1.5708, leftOffset) @{
-      clickableInfo: @{
-        enabled: true,
-        latex: ds(player.targetCol -> player.targetCol - leftEnabled
-            , controls.anim!()
-            , camera.startCamera())
-      },
-      lineOpacity: ds((2 - leftOffset) / 2 * leftEnabled),
-      fillOpacity: ds((2 - leftOffset) / 2 * 0.4),
-      lineWidth: "5",
-      color: "red"
-    }
+  fn checkWin() {
+    { won == 1: (hasWon -> 1, levelEndFrame -> global.frame) }
   }
+}
+
+ns controller {
+  fn xRotate(x, y, angle) {
+    x * cos(angle) - y * sin(angle)
+  }
+  fn yRotate(x, y, angle) {
+    x * sin(angle) + y * cos(angle)
+  }
+  
+  buttonWidth = 0.5;
+  buttonScale = 1.5;
+  buttonHeight = 1.5;
+  buttonDistance = 0.5;
+  
+  show verts = [
+    (0, 0),
+    (buttonWidth, 0.5),
+    (buttonWidth, buttonHeight),
+    (-1 * buttonWidth, buttonHeight),
+    (-1 * buttonWidth, 0.5)
+  ] @{ hidden: true }
+  
+  subst!(
+rX,
+      angle,
+      xRotate(verts.x * buttonScale, verts.y * buttonScale + buttonDistance, angle)
+    );
+  subst!(
+rY,
+      angle,
+      yRotate(verts.x * buttonScale, verts.y * buttonScale + buttonDistance, angle)
+    );
+  
+  subst!(
+button,
+      angle,
+      animOffset,
+      polygon(iso!(rX!(angle), rY!(angle), animOffset))
+    );
+  
+  topOffset = 2;
+  bottomOffset = 2;
+  rightOffset = 2;
+  leftOffset = 2;
+  
+  upEnabled = not!(controls.checkUp());
+  downEnabled = not!(controls.checkDown());
+  rightEnabled = not!(controls.checkRight());
+  leftEnabled = not!(controls.checkLeft());
+  
+  fn playAnim() {
+    rightOffset -> anim!(easeOutMix(2, 0, global.delta(0, 100)), 0, 100)
+      , topOffset -> anim!(easeOutMix(2, 0, global.delta(10, 100)), 10, 100)
+      , leftOffset -> anim!(easeOutMix(2, 0, global.delta(20, 100)), 20, 100)
+      , bottomOffset -> anim!(easeOutMix(2, 0, global.delta(30, 100)), 30, 100)
+  }
+  
+  show button!(0, topOffset) @{
+    clickableInfo: @{
+      enabled: true,
+      latex: ds(player.targetRow -> player.targetRow - upEnabled , controls.anim!())
+    },
+    lineOpacity: ds((2 - topOffset) / 2 * upEnabled),
+    fillOpacity: ds((2 - topOffset) / 2 * 0.4),
+    lineWidth: "5",
+    color: "red"
+  }
+  show button!(3.1416, bottomOffset) @{
+    clickableInfo: @{
+      enabled: true,
+      latex: ds(player.targetRow -> player.targetRow + downEnabled , controls.anim!())
+    },
+    lineOpacity: ds((2 - bottomOffset) / 2 * downEnabled),
+    fillOpacity: ds((2 - bottomOffset) / 2 * 0.4),
+    lineWidth: "5",
+    color: "red"
+  }
+  show button!(4.7124, rightOffset) @{
+    clickableInfo: @{
+      enabled: true,
+      latex: ds(player.targetCol -> player.targetCol + rightEnabled
+          , controls.anim!()
+          , camera.startCamera())
+    },
+    lineOpacity: ds((2 - rightOffset) / 2 * rightEnabled),
+    fillOpacity: ds((2 - rightOffset) / 2 * 0.4),
+    lineWidth: "5",
+    color: "red"
+  }
+  show button!(1.5708, leftOffset) @{
+    clickableInfo: @{
+      enabled: true,
+      latex: ds(player.targetCol -> player.targetCol - leftEnabled
+          , controls.anim!()
+          , camera.startCamera())
+    },
+    lineOpacity: ds((2 - leftOffset) / 2 * leftEnabled),
+    fillOpacity: ds((2 - leftOffset) / 2 * 0.4),
+    lineWidth: "5",
+    color: "red"
+  }
+}
+
+ns screen {
+  screenOpacity = 0;
+  
+  fn doFade() {
+    screenOpacity
+      -> anim!(smoothstepMix(0, 1, global.delta(state.levelEndFrame, 60)), state.levelEndFrame, 60)
+  }
+  fn fadeIn() {
+    screenOpacity -> anim!(smoothstepMix(1, 0, global.delta(state.levelStartFrame, 50)), state.levelStartFrame, 50)
+  }
+  
+  show bg = polygon((-100, -100), (-100, 100), (100, 100), (100, -100)) @{ colorLatex: ds(rgb(3, 7, 18)), fillOpacity: ds(screenOpacity) }
+}
