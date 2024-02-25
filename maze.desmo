@@ -80,16 +80,6 @@ ns player {
   
   lastAnimStart = 0;
   
-  show player = (
-      cacheCos * (cos(t) * cos(t) + x)
-      - cacheCos * (cos(t) * sin(t) + y)
-      + camera.cameraX,
-      cacheSin * (cos(t) * cos(t) + x)
-      + cacheSin * (cos(t) * sin(t) + y)
-      + camera.cameraY
-      - 1
-) @{ parametricDomain: @{ min: ds(-10), max: ds(10) } }
-  
   fn movePlayer() {
     targetX -> targetCol
       , targetY -> gridSize - targetRow - 0.5
@@ -220,28 +210,6 @@ ns grid {
 }
 
 ns walls {
-  subst!(
-drawRow,
-      rowIndex,
-      startCol,
-      length,
-      wall!(startCol, gridSize - rowIndex, startCol + length, gridSize - rowIndex)
-    );
-  
-  subst!(
-drawPillar,
-      rowIndex,
-      startCol,
-      vert!(startCol, gridSize - rowIndex, gridOffset)
-    );
-  
-  subst!(
-drawCol,
-      colIndex,
-      startRow,
-      length,
-      wall!(colIndex, gridSize - startRow, colIndex, gridSize - startRow - length)
-    );
   
   subst!(shiftRow, rowIndex, startCol, length, paramd!(
 startCol,
@@ -262,16 +230,69 @@ colIndex,
       ));
   
   binary = maze!();
-  "[rowIndex, startCol, length, rowIndex, startCol, length, ...]"
-  data = wallData!();
+  "[type, index, start, ...]"
+}
+
+ns renderer {
+  ns background {
+    show bg = polygon((-100, -100), (-100, 100), (100, 100), (100, -100)) @{ colorLatex: ds(rgb(3, 7, 18)), fillOpacity: ds(1) }
+  }
   
-  wallTypes = [data[(i * 4 - 3)] * 80 + i * 3.5 for i=[1..length!(data) / 4]];
-  colorLatex = rgb(wallTypes, 0, 0);
+  ns maze {
+    show floor = polygon(
+shiftXy!(0, 0, gridOffset),
+        shiftXy!(gridSize, 0, gridOffset),
+        shiftXy!(gridSize, gridSize, gridOffset),
+        shiftXy!(0, gridSize, gridOffset)
+      ) @{ colorLatex: ds(rgb(17, 24, 39)), fillOpacity: ds(1) }
+  }
   
-  show C = [{
-      data[(i * 4 - 3)] == 0: drawRow!(data[(i * 4 - 2)], data[(i * 4 - 1)], data[(i * 4)]),
-      drawCol!(data[(i * 4 - 2)], data[(i * 4 - 1)], data[(i * 4)])
-    } for
-    i=[1..length!(data) / 4]
-  ] @{ color: "rgb(245,13,10)", fillOpacity: "1", colorLatex: ds(colorLatex) }
+  ns walls {
+    subst!(
+drawRow,
+        rowIndex,
+        startCol,
+        wall!(startCol, gridSize - rowIndex, startCol + 1, gridSize - rowIndex)
+      );
+    
+    subst!(
+drawCol,
+        colIndex,
+        startRow,
+        wall!(colIndex, gridSize - startRow, colIndex, gridSize - startRow - 1)
+      );
+    
+    data = wallData!();
+    
+    wallTypes = [data[(i * 3 - 2)] for i=[1..length!(data) / 3]];
+    "rgb( 31, 41, 55 )"
+    "rgb( 55, 65, 81 )"
+    colorR = [{ i == 0: 31, 55 } for i=wallTypes];
+    colorG = [{ i == 0: 41, 65 } for i=wallTypes];
+    colorB = [{ i == 0: 55, 81 } for i=wallTypes];
+    colorLatex = rgb(colorR, colorG, colorB);
+    
+    show backRow = wall!(0, gridSize, gridSize, gridSize) @{ color: "rgb( 31, 41, 55 )", fillOpacity: "1" }
+    show backCol = wall!(gridSize, 0, gridSize, gridSize) @{ color: "rgb( 55, 65, 81 )", fillOpacity: "1" }
+    
+    show C = [{
+        data[(i * 3 - 2)] == 0: drawRow!(data[(i * 3 - 1)], data[(i * 3)]),
+        drawCol!(data[(i * 3 - 1)], data[(i * 3)])
+      } for i=[1..length!(data) / 3]] @{ color: "rgb(245,13,10)", fillOpacity: "1", colorLatex: ds(colorLatex) }
+  }
+  
+  ns player {
+    show character = (
+        cacheCos * (cos(t) * cos(t) + player.x)
+        - cacheCos * (cos(t) * sin(t) + player.y)
+        + camera.cameraX,
+        cacheSin * (cos(t) * cos(t) + player.x)
+        + cacheSin * (cos(t) * sin(t) + player.y)
+        + camera.cameraY
+        - 1
+) @{ parametricDomain: @{ min: ds(0), max: ds(tau!()) } }
+  }
+  
+  show frontRow = wall!(0, 0, gridSize, 0) @{ color: "rgb( 31, 41, 55 )", fillOpacity: "1" }
+  show frontCol = wall!(0, 0, 0, gridSize) @{ color: "rgb( 55, 65, 81 )", fillOpacity: "1" }
 }

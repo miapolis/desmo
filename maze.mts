@@ -32,6 +32,13 @@ export default function ({ addMacro, addLatexMacro }) {
   });
 
   addLatexMacro({
+    name: "tau",
+    fn: (node, a: MacroAPI) => {
+      return "2\\pi";
+    },
+  });
+
+  addLatexMacro({
     name: "gameLoopLatex",
     fn: (node, a: MacroAPI) => {
       return "G_{ameLoop}\\left(\\operatorname{dt}\\right)";
@@ -65,12 +72,6 @@ export const createOptimizedMaze = () => {
     if (cell.row == 0) cell.walls[0] = 0;
     if (cell.row == GRID_SIZE - 1) cell.walls[2] = 0;
   }
-
-  // Consolidate walls by first going row by row then column by column
-  // Syntax [type (0 = row, 1 = column), rowIndex, startCol, length, 0, rowIndex, startCol, length, ...]
-  const consolidatedRows = new Array<number>();
-  // [1, colIndex, startRow, length, 1, colIndex, startRow, length, ...]
-  const consolidatedCols = new Array<number>();
 
   interface WallGroup {
     type: "row" | "column";
@@ -112,65 +113,40 @@ export const createOptimizedMaze = () => {
     k++;
   }
 
-  const areWallsIntersecting = (horizontal: WallGroup, vertical: WallGroup) => {
-    return (
-      // It's within the span of the horizontal wall
-      vertical.index > horizontal.start &&
-      vertical.index < horizontal.start + horizontal.length &&
-      // It passes through the index of the horizontal wall (can't be just adjacent, has to be passing through it)
-      vertical.start < horizontal.index &&
-      vertical.start + vertical.length > horizontal.index
-    );
-  };
-
-  const horizontal = consolidatedWalls.filter((x) => x.type == "row");
-  const vertical = consolidatedWalls.filter((x) => x.type == "column");
-
-  // We cannot allow isometric walls to insersect each other, so we need to split columns that are intersected by rows
-  const intersectionPairs = vertical.flatMap((v) =>
-    horizontal
-      .filter((h) => areWallsIntersecting(h, v))
-      .map((h) => ({ horizontal: h, vertical: v }))
-  );
-
-  for (const { vertical, horizontal } of intersectionPairs) {
-    // Delete the original unsplit column
-    const index = consolidatedWalls.indexOf(vertical);
-    consolidatedWalls.splice(index, 1);
-
-    // Split the column into two new columns
-    const left = {
-      type: "column" as const,
-      index: vertical.index,
-      start: vertical.start,
-      length: horizontal.index - vertical.start,
-    };
-    const right = {
-      type: "column" as const,
-      index: vertical.index,
-      start: horizontal.index,
-      length: vertical.start + vertical.length - horizontal.index,
-    };
-
-    consolidatedWalls.push(left, right);
+  // Split every wall into one-cell wide walls
+  const newConsolidatedWalls = new Array<WallGroup>();
+  for (const wall of consolidatedWalls) {
+    if (wall.length === 1) {
+      newConsolidatedWalls.push(wall);
+    } else {
+      for (let j = 0; j < wall.length; j++) {
+        newConsolidatedWalls.push({
+          type: wall.type,
+          index: wall.index,
+          start: wall.start + j,
+          length: 1,
+        });
+      }
+    }
   }
 
-  // Sort all of the rows and columns by the "highest" isometric points first
+  // Painter's algorithm https://en.wikipedia.org/wiki/Painter%27s_algorithm
+  // Sort all of the rows and columns by the "highest" isometric points first or the "depth"
   // This is to ensure that the walls are drawn in the correct order
   const getOrderEval = (w: WallGroup) => {
     if (w.type == "row") {
-      // If it's a row, the "highest" point is a low row index and a high start + length value
-      return -1 * w.index + w.start + w.length;
+      // If it's a row, the "highest" point is a low row index and a high start value
+      return -1 * w.index + w.start;
     } else {
       // For a column the "highest" point is a high column index and a low start value
       return w.index - w.start;
     }
   };
 
-  consolidatedWalls.sort((a, b) => getOrderEval(b) - getOrderEval(a));
+  newConsolidatedWalls.sort((a, b) => getOrderEval(b) - getOrderEval(a));
 
-  const flattened = consolidatedWalls
-    .map((w) => [w.type == "row" ? 0 : 1, w.index, w.start, w.length])
+  const flattened = newConsolidatedWalls
+    .map((w) => [w.type == "row" ? 0 : 1, w.index, w.start])
     .flat();
 
   return { cells, walls: flattened };
