@@ -12,8 +12,8 @@ gridSize = 10;
 proj = 3.5;
 gridOffset = 0.75;
 
-cacheCos = cos(proj / 6);
-cacheSin = sin(proj / 6);
+cosProj = cos(proj / 6);
+sinProj = sin(proj / 6);
 
 subst!(sum, a, b, a + b);
 subst!(diff, a, b, a - b);
@@ -178,43 +178,43 @@ ns controls {
 }
 
 subst!(param, x1, y1, x2, y2, (
-      cacheCos * ((1 - t) * x1 + t * x2)
-      - cacheCos * ((1 - t) * y1 + t * y2)
+      cosProj * ((1 - t) * x1 + t * x2)
+      - cosProj * ((1 - t) * y1 + t * y2)
       + camera.cameraX,
-      cacheSin * ((1 - t) * x1 + t * x2)
-      + cacheSin * ((1 - t) * y1 + t * y2)
+      sinProj * ((1 - t) * x1 + t * x2)
+      + sinProj * ((1 - t) * y1 + t * y2)
       + camera.cameraY
       - 1
 ));
 
 subst!(vert, x, y, length, (
-      x * cacheCos - y * cacheCos + camera.cameraX,
-      x * cacheSin + y * cacheSin - length * t - 1 + camera.cameraY
+      x * cosProj - y * cosProj + camera.cameraX,
+      x * sinProj + y * sinProj - length * t - 1 + camera.cameraY
 ));
 
 subst!(paramd, x1, y1, x2, y2, offsetX, offsetY, (
-      cacheCos * ((1 - t) * x1 + t * x2)
-      - cacheCos * ((1 - t) * y1 + t * y2)
+      cosProj * ((1 - t) * x1 + t * x2)
+      - cosProj * ((1 - t) * y1 + t * y2)
       + camera.cameraX
       + offsetX,
-      cacheSin * ((1 - t) * x1 + t * x2)
-      + cacheSin * ((1 - t) * y1 + t * y2)
+      sinProj * ((1 - t) * x1 + t * x2)
+      + sinProj * ((1 - t) * y1 + t * y2)
       + camera.cameraY
       + offsetY
       - 1
 ));
 
 subst!(iso, xVar, yVar, yOffset, (
-      cacheCos * xVar - cacheCos * yVar,
-      cacheSin * xVar + cacheSin * yVar - 1 - yOffset
+      cosProj * xVar - cosProj * yVar,
+      sinProj * xVar + sinProj * yVar - 1 - yOffset
 ));
 subst!(xy, xVar, yVar, (
-      cacheCos * xVar - cacheCos * yVar + camera.cameraX,
-      cacheSin * xVar + cacheSin * yVar + camera.cameraY - 1
+      cosProj * xVar - cosProj * yVar + camera.cameraX,
+      sinProj * xVar + sinProj * yVar + camera.cameraY - 1
 ));
 subst!(shiftXy, xVar, yVar, offsetY, (
-      cacheCos * xVar - cacheCos * yVar + camera.cameraX,
-      cacheSin * xVar + cacheSin * yVar + camera.cameraY - 1 - offsetY
+      cosProj * xVar - cosProj * yVar + camera.cameraX,
+      sinProj * xVar + sinProj * yVar + camera.cameraY - 1 - offsetY
 ));
 
 subst!(wall, x1, y1, x2, y2, polygon(
@@ -365,11 +365,11 @@ debouncedCol,
     
     ns character {
       subst!(circle, offset, size, (
-            cacheCos * (cos(t) * cos(t) * size + player.x + (1 - size) / 2)
-            - cacheCos * (cos(t) * sin(t) * size + player.y)
+            cosProj * (cos(t) * cos(t) * size + player.x + (1 - size) / 2)
+            - cosProj * (cos(t) * sin(t) * size + player.y)
             + camera.cameraX,
-            cacheSin * (cos(t) * cos(t) * size + player.x)
-            + cacheSin * (cos(t) * sin(t) * size + player.y)
+            sinProj * (cos(t) * cos(t) * size + player.x)
+            + sinProj * (cos(t) * sin(t) * size + player.y)
             + camera.cameraY
             - 1
             - offset
@@ -426,11 +426,11 @@ walls.lineData[(i * 4 - 2)],
     offset = 0;
 
     subst!(rose, size, baseOffset, (
-          cacheCos * (size * cos(1.5 * t + rot) * cos(t) + gridSize - 0.5)
-          - cacheCos * (size * cos(1.5 * t + rot) * sin(t) + 0.5)
+          cosProj * (size * cos(1.5 * t + rot) * cos(t) + gridSize - 0.5)
+          - cosProj * (size * cos(1.5 * t + rot) * sin(t) + 0.5)
           + camera.cameraX,
-          cacheSin * (size * cos(1.5 * t + rot) * cos(t) + gridSize - 0.5)
-          + cacheSin * (size * cos(1.5 * t + rot) * sin(t) + 0.5)
+          sinProj * (size * cos(1.5 * t + rot) * cos(t) + gridSize - 0.5)
+          + sinProj * (size * cos(1.5 * t + rot) * sin(t) + 0.5)
           + camera.cameraY - 1 + baseOffset + offset
     ));
 
