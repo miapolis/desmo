@@ -60,6 +60,7 @@ fn gameLoop(delta) {
     (player.movePlayer(), camera.adjustCameraToPlayer(), renderer.target.rotate(), state.checkWin(), { state.levelStartFrame > 0: { global.frame < (state.levelStartFrame + 50): screen.fadeIn() }}),
   }
     , { global.frame < 130: controller.playAnim() }
+    , { global.frame < 40: camera.animateIn() }
     ,  global.tick(delta)
 }
 
@@ -81,7 +82,7 @@ ns global {
 
 ns camera {
   cameraX = 0;
-  cameraY = 4;
+  cameraY = 2;
   
   targetX = 0;
   targetY = 0;
@@ -100,6 +101,11 @@ ns camera {
   }
   fn reset() {
     cameraX -> 0 , cameraY -> 4
+  }
+
+  fn animateIn() {
+    cameraY -> anim!(easeOutMix(2, 4, global.delta(0, 40)), 0, 40),
+    screen.screenOpacity -> anim!(smoothstepMix(1, 0, global.delta(0, 40)), 0, 40)
   }
 }
 
@@ -576,7 +582,7 @@ button,
 }
 
 ns screen {
-  screenOpacity = 0;
+  screenOpacity = 1;
   
   fn doFade() {
     screenOpacity
