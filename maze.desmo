@@ -57,7 +57,7 @@ fn gameLoop(delta) {
           screen.doFade() 
       },
     },
-    (player.movePlayer(), camera.adjustCameraToPlayer(), state.checkWin(), { state.levelStartFrame > 0: { global.frame < (state.levelStartFrame + 50): screen.fadeIn() }}),
+    (player.movePlayer(), camera.adjustCameraToPlayer(), renderer.target.rotate(), state.checkWin(), { state.levelStartFrame > 0: { global.frame < (state.levelStartFrame + 50): screen.fadeIn() }}),
   }
     , { global.frame < 130: controller.playAnim() }
     ,  global.tick(delta)
@@ -387,7 +387,7 @@ debouncedCol,
         lineOpacity: "1"
       }
     }
-    
+   
     show frontPolygons = [getFrontPolygon(i) for i=[1..length!(walls.polyData) / 3]] @{ fillOpacity: "1", colorLatex: ds(colorLatex), lines: false }
     
     show parametrics = [{
@@ -412,6 +412,50 @@ walls.lineData[(i * 4 - 2)],
     subst!(p, i, n, idx[(i * 4 - n)] * gridSize);
     
     show [param!(p!(i, 3), p!(i, 2), p!(i, 1), p!(i, 0)) for i=[1..16]] @{ color: "rgb(209,213,219)", fillOpacity: "1", lineWidth: "5" }
+  }
+
+  ns target {
+    rot = 0;
+    offset = 0;
+
+    subst!(rose, size, baseOffset, (
+          cacheCos * (size * cos(1.5 * t + rot) * cos(t) + gridSize - 0.5)
+          - cacheCos * (size * cos(1.5 * t + rot) * sin(t) + 0.5)
+          + camera.cameraX,
+          cacheSin * (size * cos(1.5 * t + rot) * cos(t) + gridSize - 0.5)
+          + cacheSin * (size * cos(1.5 * t + rot) * sin(t) + 0.5)
+          + camera.cameraY - 1 + baseOffset + offset
+    ));
+
+    fn rotate() {
+      rot -> rot + 0.0025 * global.deltaTime,
+      offset -> 0.5 + 0.5 * sin(rot / 2)
+    }
+
+    show rose0 = rose!(0.1, 0) @{
+      parametricDomain: @{ min: ds(0), max: ds(2 * tau!()) },
+      color: "rgb(6, 182, 212)",
+      lineWidth: "4",
+      lineOpacity: "0.5"
+    }
+    show rose1 = rose!(0.25, 0.5) @{
+      parametricDomain: @{ min: ds(0), max: ds(2 * tau!()) },
+      color: "rgb(20, 184, 166)",
+      lineWidth: "4",
+      lineOpacity: "0.75"
+    }
+    show rose2 = rose!(0.5, 1) @{
+      parametricDomain: @{ min: ds(0), max: ds(2 * tau!()) },
+      color: "rgb(16, 185, 129)",
+      lineWidth: "4",
+      lineOpacity: "0.875"
+    }
+    show rose3 = rose!(0.75, 1.5) @{
+      parametricDomain: @{ min: ds(0), max: ds(2 * tau!()) },
+      color: "rgb(34, 197, 94)",
+      lineWidth: "4",
+      lineOpacity: "1"
+    }
   }
 }
 
