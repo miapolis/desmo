@@ -1,27 +1,34 @@
 import type { MacroAPI } from "desmoscript/dist/macro/macro-api";
 
 export default function ({ addMacro, addLatexMacro }) {
-  const { cells, polygons, parametrics } = createOptimizedMaze();
+  const mazes = [
+    createOptimizedMaze(10),
+    createOptimizedMaze(11),
+    createOptimizedMaze(12),
+    createOptimizedMaze(13),
+    createOptimizedMaze(14),
+  ];
 
   addMacro({
     name: "maze",
     fn: (node, a) => {
-      const walls = cells.map((cell) => cell.walls).flat();
+      const index = parseInt(node.params[0].number);
+      const walls = mazes[index]!.cells.map((cell) => cell.walls).flat();
       return a.parseExpr(`[${walls.join(",")}]`);
     },
   });
-
   addMacro({
     name: "polygonData",
     fn: (node, a) => {
-      return a.parseExpr(`[${polygons.join(",")}]`);
+      const index = parseInt(node.params[0].number);
+      return a.parseExpr(`[${mazes[index]!.polygons.join(",")}]`);
     },
   });
-
   addMacro({
     name: "parametricData",
     fn: (node, a) => {
-      return a.parseExpr(`[${parametrics.join(",")}]`);
+      const index = parseInt(node.params[0].number);
+      return a.parseExpr(`[${mazes[index]!.parametrics.join(",")}]`);
     },
   });
 
@@ -53,31 +60,29 @@ export default function ({ addMacro, addLatexMacro }) {
   });
 }
 
-const GRID_SIZE = 12;
-const CELL_COUNT = GRID_SIZE ** 2;
-
 const FIRST_CELL = "FIRST_CELL";
-const LAST_COORD = `${GRID_SIZE - 1},${GRID_SIZE - 1}`;
+const LAST_COORD = (size: number) => `${size - 1},${size - 1}`;
 const START = "START";
 const FINISH = "FINISH";
 
-const cellMarkers = new Map([
-  [FIRST_CELL, (cell: Cell) => cell.visit()], // first cell is inherently visited
-  ["0,0", (cell: Cell) => cell.markAsStart()],
-  [LAST_COORD, (cell: Cell) => cell.markAsFinish()],
-]);
+const cellMarkers = (size: number) =>
+  new Map([
+    [FIRST_CELL, (cell: Cell) => cell.visit()], // first cell is inherently visited
+    ["0,0", (cell: Cell) => cell.markAsStart()],
+    [LAST_COORD(size), (cell: Cell) => cell.markAsFinish()],
+  ]);
 
-export const createOptimizedMaze = () => {
-  const rows = generateMaze() as Cell[][];
+export const createOptimizedMaze = (size = 12) => {
+  const rows = generateMaze(size) as Cell[][];
   const columns = transposeArray(rows);
 
   const cells = rows.flat();
   // Remove outer most walls
   for (const cell of cells) {
     if (cell.col == 0) cell.walls[3] = 0;
-    if (cell.col == GRID_SIZE - 1) cell.walls[1] = 0;
+    if (cell.col == size - 1) cell.walls[1] = 0;
     if (cell.row == 0) cell.walls[0] = 0;
-    if (cell.row == GRID_SIZE - 1) cell.walls[2] = 0;
+    if (cell.row == size - 1) cell.walls[2] = 0;
   }
 
   interface WallGroup {
@@ -163,25 +168,28 @@ export const createOptimizedMaze = () => {
 };
 
 export const generateMaze = (
-  cells = generateCells(),
-  cell = getRandomCell(cells),
+  size = 12,
+  cells = generateCells(size),
+  cell = getRandomCell(cells, size),
   stack = createStack(),
   visitedCount = 0
 ) => {
-  const neighbor = getUnvisitedNeighbor(cells, cell);
+  const neighbor = getUnvisitedNeighbor(cells, cell, size);
   const nextCell = neighbor || stack.pop();
   const increment = neighbor ? 1 : 0;
 
-  markCell(cell, visitedCount);
+  markCell(cell, visitedCount, size);
 
   if (neighbor) {
     neighbor.visit(cell);
     stack.push(neighbor);
   }
 
-  return visitedCount == CELL_COUNT - 1
+  const cellCount = size ** 2;
+
+  return visitedCount == cellCount - 1
     ? cells
-    : generateMaze(cells, nextCell, stack, visitedCount + increment);
+    : generateMaze(size, cells, nextCell, stack, visitedCount + increment);
 };
 
 const createFilledArray = (length: number, predicate: any) =>
@@ -189,16 +197,16 @@ const createFilledArray = (length: number, predicate: any) =>
     .fill(null)
     .map((_, i) => predicate(i));
 
-const generateCells = (): Cell[] => {
-  return createFilledArray(GRID_SIZE, (col: number) =>
-    createFilledArray(GRID_SIZE, (row: number) => new Cell(col, row))
+const generateCells = (size: number): Cell[] => {
+  return createFilledArray(size, (col: number) =>
+    createFilledArray(size, (row: number) => new Cell(col, row))
   );
 };
 
-const markCell = (cell: Cell, visitedCount: number) => {
+const markCell = (cell: Cell, visitedCount: number, size: number) => {
   const key = visitedCount == 0 ? FIRST_CELL : cell.toString();
-  if (cellMarkers.has(key)) {
-    cellMarkers.get(key)!(cell);
+  if (cellMarkers(size).has(key)) {
+    cellMarkers(size).get(key)!(cell);
   }
 };
 
@@ -249,25 +257,26 @@ const toggleWallBits = (cell: Cell, neighbor: Cell) =>
 const getRandomNumber = (max = 1, method = "round") =>
   Math[method](Math.random() * max);
 
-const getRandomCell = (cells: Cell[]) =>
-  cells[getRandomNumber(GRID_SIZE - 1)][getRandomNumber(GRID_SIZE - 1)];
+const getRandomCell = (cells: Cell[], size: number) =>
+  cells[getRandomNumber(size - 1)][getRandomNumber(size - 1)];
 
 const getUnvisitedNeighbors = (
   cells: Cell[],
-  { col, row }: { col: number; row: number }
+  { col, row }: { col: number; row: number },
+  size: number
 ) => {
   const previousColumn = col > 0 ? cells[col - 1][row] : null;
   const previousRow = row > 0 ? cells[col][row - 1] : null;
-  const nextColumn = col < GRID_SIZE - 1 ? cells[col + 1][row] : null;
-  const nextRow = row < GRID_SIZE - 1 ? cells[col][row + 1] : null;
+  const nextColumn = col < size - 1 ? cells[col + 1][row] : null;
+  const nextRow = row < size - 1 ? cells[col][row + 1] : null;
 
   return [previousColumn, previousRow, nextColumn, nextRow]
     .filter(Boolean)
     .filter((cell) => !cell.isVisited);
 };
 
-const getUnvisitedNeighbor = (cells: Cell[], cell: Cell) => {
-  const neighbours = getUnvisitedNeighbors(cells, cell);
+const getUnvisitedNeighbor = (cells: Cell[], cell: Cell, size: number) => {
+  const neighbours = getUnvisitedNeighbors(cells, cell, size);
   return neighbours[getRandomNumber(neighbours.length, "floor")] || null;
 };
 

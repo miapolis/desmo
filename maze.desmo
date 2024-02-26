@@ -8,7 +8,7 @@ settings @{
     userLockedViewport: true
   }
 
-gridSize = 12;
+gridSize = 10;
 proj = 3.5;
 gridOffset = 0.75;
 
@@ -53,7 +53,7 @@ fn gameLoop(delta) {
   {
     state.hasWon == 1: {
       state.levelEndFrame > 0: { 
-          global.frame > (state.levelEndFrame + 70): (player.reset(), camera.reset(), state.hasWon -> 0, state.levelEndFrame -> 0, state.levelStartFrame -> global.frame),
+          global.frame > (state.levelEndFrame + 70): (player.reset(), camera.reset(), state.hasWon -> 0, state.level -> min(state.level + 1, 5), walls.nextLevel(), state.levelEndFrame -> 0, state.levelStartFrame -> global.frame),
           screen.doFade() 
       },
     },
@@ -235,10 +235,37 @@ colIndex,
         0,
         gridOffset * -1
       ));
+
+  bin1 = maze!(0);
+  poly1 = polygonData!(0);
+  line1 = parametricData!(0);
+
+  bin2 = maze!(1);
+  poly2 = polygonData!(1);
+  line2 = parametricData!(1);
+
+  bin3 = maze!(2);
+  poly3 = polygonData!(2);
+  line3 = parametricData!(2);
+
+  bin4 = maze!(3);
+  poly4 = polygonData!(3);
+  line4 = parametricData!(3);
+
+  bin5 = maze!(4);
+  poly5 = polygonData!(4);
+  line5 = parametricData!(4);
   
-  binary = maze!();
-  polyData = polygonData!();
-  lineData = parametricData!();
+  binary = bin1;
+  polyData = poly1;
+  lineData = line1;
+
+  fn nextLevel() {
+    binary -> { state.level == 1: bin2, state.level == 2: bin3, state.level == 3: bin4, bin5 },
+    polyData -> { state.level == 1: poly2, state.level == 2: poly3, state.level == 3: poly4, poly5 },
+    lineData -> { state.level == 1: line2, state.level == 2: line3, state.level == 3: line4, line5 },
+    gridSize -> min(gridSize + 1, 14)
+  }
 }
 
 ns renderer {
@@ -392,6 +419,7 @@ ns state {
   last = gridSize - 1;
   won = { player.row == last: { player.col == last: 1, 0 } };
 
+  level = 1;
   hasWon = 0;
   levelStartFrame = 0;
   levelEndFrame = 0;
