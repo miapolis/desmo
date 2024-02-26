@@ -1,3 +1,5 @@
+// If using VSCode in browser: https://gist.github.com/miapolis/619bcbd6c10a6e321323706ad8b18816
+
 import type { MacroAPI } from "desmoscript/dist/macro/macro-api";
 
 export default function ({ addMacro, addLatexMacro }) {
