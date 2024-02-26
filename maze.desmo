@@ -12,9 +12,6 @@ gridSize = 10;
 proj = 3.5;
 gridOffset = 0.75;
 
-black = rgb(0, 0, 0);
-gray = rgb(200, 200, 200);
-
 cacheCos = cos(proj / 6);
 cacheSin = sin(proj / 6);
 
@@ -173,6 +170,10 @@ ns controls {
       player.col < diff!(gridSize, 1): getCellWalls(getCellIndex(player.row, player.col))[3],
       1
     }
+  }
+
+  fn canMove() {
+    {diff!(global.frame, player.lastAnimStart) > 1: 1, 0}
   }
 }
 
@@ -538,7 +539,7 @@ button,
   show button!(0, topOffset) @{
     clickableInfo: @{
       enabled: true,
-      latex: ds(player.targetRow -> player.targetRow - upEnabled , controls.anim!())
+      latex: ds({ controls.canMove() == 1: (player.targetRow -> player.targetRow - upEnabled , controls.anim!()) })
     },
     lineOpacity: ds((2 - topOffset) / 2 * upEnabled),
     fillOpacity: ds((2 - topOffset) / 2 * 0.4),
@@ -548,7 +549,7 @@ button,
   show button!(3.1416, bottomOffset) @{
     clickableInfo: @{
       enabled: true,
-      latex: ds(player.targetRow -> player.targetRow + downEnabled , controls.anim!())
+      latex: ds({ controls.canMove() == 1: (player.targetRow -> player.targetRow + downEnabled , controls.anim!()) })
     },
     lineOpacity: ds((2 - bottomOffset) / 2 * downEnabled),
     fillOpacity: ds((2 - bottomOffset) / 2 * 0.4),
@@ -558,9 +559,9 @@ button,
   show button!(4.7124, rightOffset) @{
     clickableInfo: @{
       enabled: true,
-      latex: ds(player.targetCol -> player.targetCol + rightEnabled
+      latex: ds({ controls.canMove() == 1: (player.targetCol -> player.targetCol + rightEnabled
           , controls.anim!()
-          , camera.startCamera())
+          , camera.startCamera()) })
     },
     lineOpacity: ds((2 - rightOffset) / 2 * rightEnabled),
     fillOpacity: ds((2 - rightOffset) / 2 * 0.4),
@@ -570,9 +571,9 @@ button,
   show button!(1.5708, leftOffset) @{
     clickableInfo: @{
       enabled: true,
-      latex: ds(player.targetCol -> player.targetCol - leftEnabled
+      latex: ds({ controls.canMove() == 1: (player.targetCol -> player.targetCol - leftEnabled
           , controls.anim!()
-          , camera.startCamera())
+          , camera.startCamera()) })
     },
     lineOpacity: ds((2 - leftOffset) / 2 * leftEnabled),
     fillOpacity: ds((2 - leftOffset) / 2 * 0.4),
