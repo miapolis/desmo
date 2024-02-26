@@ -1,5 +1,8 @@
 import script "./maze.mjs"
 
+"Created with Desmoscript, a language that compiles down to Desmos expressions: https://github.com/radian628/desmoscript"
+"You can look through the expressions but most aren't particularly legible—view the full source code at https://github.com/miapolis/desmo"
+
 settings @{
     viewport: @{ xmin: -18, ymin: -20, xmax: 19, ymax: 40 },
     showGrid: false,
@@ -33,19 +36,25 @@ fn mix(a, b, factor) {
   b * clampedFactor + a * (1 - clampedFactor)
 }
 
+"https://easings.net/#easeOutCubic"
 show fn easeInOutCubic(t) {
   { t < 0.5: 4 * t * t * t, 1 - (-2 * t + 2) ^ 3 / 2 }
 } @{ hidden: true }
 
+"https://en.wikipedia.org/wiki/Smoothstep"
 fn smoothstepMix(a, b, factor) {
   mix(a, b, factor * factor * (3 - factor * 2))
 }
-fn easeOutMix(a, b, factor) {
+
+fn easeInOutMix(a, b, factor) {
   mix(a, b, easeInOutCubic(factor))
 }
 
+"Desmos supports tickers, enabling game loops"
 ticker @{ handlerLatex: ds(gameLoopLatex!()), playing: true, open: true }
 
+"https://gameprogrammingpatterns.com/game-loop.html"
+"This is very verbose for a game loop, but more or less still adheres to common patterns found in modern game engines like https://docs.unity3d.com/Manual/ExecutionOrder.html"
 fn gameLoop(delta) {
   {
     state.hasWon == 1: {
@@ -57,21 +66,26 @@ fn gameLoop(delta) {
     (player.movePlayer(), camera.adjustCameraToPlayer(), renderer.target.rotate(), state.checkWin(), { state.levelStartFrame > 0: { global.frame < (state.levelStartFrame + 50): screen.fadeIn() }}),
   }
     , { global.frame < 130: controller.playAnim() }
-    , { global.frame < 40: camera.animateIn() }
+    , { global.frame < 50: camera.animateIn() }
     ,  global.tick(delta)
 }
 
 ns global {
+  "The frame counter and delta time are used to drive the game loop and all animations. Delta time is the time in milliseconds since the last frame. Desmos surprisingly has this feature as the variable 'dt' in a ticker"
   frame = 0;
+  "As more polygons and parametrics are drawn in the scene, the time taken to render a frame will increase as it is more computationally intense"
+  "By multiplying animations, player speed, camera movement, etc. by delta time, the scene will run at the same speed regardless of the frame rate, even if it appears choppier"
   deltaTime = 0;
   
+  "https://en.wikipedia.org/wiki/Linear_interpolation"
+  "can't be used for non-player animations however—causes extreme jitter"
   fn lerp(a, b, time) {
     (1 - time * deltaTime / 16) * a + time * deltaTime / 16 * b
   }
   show fn delta(start, duration) {
     mod((frame - start), duration) / duration
   } @{ hidden: true }
-  
+  "Runs at the end of every frame, updates the frame counter and delta time"
   fn tick(elapsed) {
     frame -> frame + 1 , deltaTime -> elapsed
   }
@@ -92,6 +106,7 @@ ns camera {
   fn startCamera() {
     lastAnimStart -> { movingX!() > 0: lastAnimStart, global.frame }
   }
+  "Lerp the camera to the player's position, with a slight delay to make it feel more natural"
   fn adjustCameraToPlayer() {
     targetX -> -1 * player.x
       , cameraX -> global.lerp(cameraX, targetX, global.delta(lastAnimStart, 4000))
@@ -101,16 +116,14 @@ ns camera {
   }
 
   fn animateIn() {
-    cameraY -> anim!(easeOutMix(2, 4, global.delta(0, 40)), 0, 40),
-    screen.screenOpacity -> anim!(smoothstepMix(1, 0, global.delta(0, 40)), 0, 40)
+    cameraY -> anim!(easeInOutMix(2, 4, global.delta(20, 30)), 20, 30),
+    screen.screenOpacity -> anim!(smoothstepMix(1, 0, global.delta(20, 30)), 20, 30)
   }
 }
 
 ns player {
   row = 0;
   col = 0;
-  
-  respectiveIndex = row * gridSize + col + 1;
   
   x = col;
   y = gridSize - row;
@@ -144,6 +157,7 @@ ns controls {
     row * gridSize + col + 1
   }
   
+  "Collider data is loaded as four bits per cell, in the order [left, bottom, right, top] so [1, 1, 1, 0] would be a cell with walls everywhere except the top"
   show fn getCellWalls(idx) {
     [
       walls.binary[(idx * 4 - 3)],
@@ -153,6 +167,8 @@ ns controls {
     ]
   } @{ hidden: true }
   
+  "Collision 'detection' in this case is actually really simple, just checking the walls of the current cell of the player"
+
   fn checkUp() {
     { player.row > 0: getCellWalls(getCellIndex(player.row, player.col))[4], 1 }
   }
@@ -173,9 +189,12 @@ ns controls {
   }
 
   fn canMove() {
-    {diff!(global.frame, player.lastAnimStart) > 1: 1, 0}
+    {diff!(global.frame, player.lastAnimStart) > 3: 1, 0}
   }
 }
+
+"Parametric line macro for isometric space, uses the projection constants to convert from isometric to screen space https://en.wikipedia.org/wiki/Isometric_video_game_graphics"
+"t is restricted to the range [0, 1] since using sin and cos amplitude to restrict leads to garbage performance"
 
 subst!(param, x1, y1, x2, y2, (
       cosProj * ((1 - t) * x1 + t * x2)
@@ -187,23 +206,7 @@ subst!(param, x1, y1, x2, y2, (
       - 1
 ));
 
-subst!(vert, x, y, length, (
-      x * cosProj - y * cosProj + camera.cameraX,
-      x * sinProj + y * sinProj - length * t - 1 + camera.cameraY
-));
-
-subst!(paramd, x1, y1, x2, y2, offsetX, offsetY, (
-      cosProj * ((1 - t) * x1 + t * x2)
-      - cosProj * ((1 - t) * y1 + t * y2)
-      + camera.cameraX
-      + offsetX,
-      sinProj * ((1 - t) * x1 + t * x2)
-      + sinProj * ((1 - t) * y1 + t * y2)
-      + camera.cameraY
-      + offsetY
-      - 1
-));
-
+"Isometric utility macros"
 subst!(iso, xVar, yVar, yOffset, (
       cosProj * xVar - cosProj * yVar,
       sinProj * xVar + sinProj * yVar - 1 - yOffset
@@ -217,6 +220,7 @@ subst!(shiftXy, xVar, yVar, offsetY, (
       sinProj * xVar + sinProj * yVar + camera.cameraY - 1 - offsetY
 ));
 
+"Walls are drawn as polygons, parametrics too imperformant for this many lines"
 subst!(wall, x1, y1, x2, y2, polygon(
 xy!(x1, y1),
       xy!(x2, y2),
@@ -224,25 +228,10 @@ xy!(x1, y1),
       shiftXy!(x1, y1, gridOffset)
     ));
 
+"All collision, polygon, and parametric data for mazes is generated with a script—not written in Desmos: https://github.com/miapolis/desmo/blob/main/maze.mts"
+"These macros compile to static lists that otherwise would probably be too difficult to generate in Desmos alone"
+"⚠️ Big expressions, causes lag when opened"
 ns walls {
-  subst!(shiftRow, rowIndex, startCol, length, paramd!(
-startCol,
-        gridSize - rowIndex,
-        startCol + length,
-        gridSize - rowIndex,
-        0,
-        gridOffset * -1
-      ));
-  
-  subst!(shiftCol, colIndex, startRow, length, paramd!(
-colIndex,
-        gridSize - startRow,
-        colIndex,
-        gridSize - startRow - length,
-        0,
-        gridOffset * -1
-      ));
-
   bin1 = maze!(0);
   poly1 = polygonData!(0);
   line1 = parametricData!(0);
@@ -275,12 +264,17 @@ colIndex,
   }
 }
 
+"Isometric + parametric renderer"
+"Walls and other 'filled' objects are drawn as polygons, lines are drawn as parametric equations"
+"See https://arc.net/e/D0D2FA07-26EC-43F7-ABC7-D12B06758A7A"
 ns renderer {
   ns background {
+    "Background polygon"
     show bg = polygon((-100, -100), (-100, 100), (100, 100), (100, -100)) @{ colorLatex: ds(rgb(3, 7, 18)), fillOpacity: ds(1) }
   }
   
   ns maze {
+    "Floor polygon"
     show floor = polygon(
 shiftXy!(0, 0, gridOffset),
         shiftXy!(gridSize, 0, gridOffset),
@@ -320,12 +314,12 @@ parametricCol,
         param!(colIndex, gridSize - startRow, colIndex, gridSize - startRow - length)
       );
     
+    "All walls are drawn as polygons, stored in two separate lists based on player depth"
     wallTypes = [walls.polyData[(i * 3 - 2)] for i=[1..length!(walls.polyData) / 3]];
-    "rgb( 31, 41, 55 )"
-    "rgb( 55, 65, 81 )"
     colorR = [{ i == 0: 31, 55 } for i=wallTypes];
     colorG = [{ i == 0: 41, 65 } for i=wallTypes];
     colorB = [{ i == 0: 55, 81 } for i=wallTypes];
+    "A color latex expression is used to color the walls based on their type (horizontal or vertical)"
     colorLatex = rgb(colorR, colorG, colorB);
     
     show backRow = wall!(0, gridSize, gridSize, gridSize) @{ color: "rgb( 31, 41, 55 )", fillOpacity: "1" }
@@ -344,6 +338,8 @@ debouncedCol,
         { player.targetCol < player.col: player.targetCol, player.col }
       );
     
+    "Returns walls to be rendered before the player, filtering based on depth"
+    "There's actually a lot of nuance to this, like using some debounced values of the player's position to prevent frames where polygons are sorted incorrectly, due to the player transitioning between two cells"
     fn getRearPolygon(i) {
       {
         type!(i) == 0: {
@@ -352,6 +348,7 @@ debouncedCol,
         (bool!(index!(i) > debouncedCol!()) * bool!(start!(i) <= debouncedRow!())) == 1: polygonCol!(index!(i), start!(i))
       }
     }
+    "Rendering front polygons is just the negation of the rear polygons"
     fn getFrontPolygon(i) {
       {
         type!(i) == 0: {
@@ -364,6 +361,7 @@ debouncedCol,
     show rearPolygons = [getRearPolygon(i) for i=[1..length!(walls.polyData) / 3]] @{ fillOpacity: "1", colorLatex: ds(colorLatex), lines: false }
     
     ns character {
+      "Macro to generate a circle, taking into account camera position and offset"
       subst!(circle, offset, size, (
             cosProj * (cos(t) * cos(t) * size + player.x + (1 - size) / 2)
             - cosProj * (cos(t) * sin(t) * size + player.y)
@@ -395,6 +393,7 @@ debouncedCol,
       }
     }
    
+    "Render the front polygons"
     show frontPolygons = [getFrontPolygon(i) for i=[1..length!(walls.polyData) / 3]] @{ fillOpacity: "1", colorLatex: ds(colorLatex), lines: false }
     
     show parametrics = [{
@@ -530,10 +529,10 @@ button,
   leftEnabled = not!(controls.checkLeft());
   
   fn playAnim() {
-    rightOffset -> anim!(easeOutMix(2, 0, global.delta(0, 100)), 0, 100)
-      , topOffset -> anim!(easeOutMix(2, 0, global.delta(10, 100)), 10, 100)
-      , leftOffset -> anim!(easeOutMix(2, 0, global.delta(20, 100)), 20, 100)
-      , bottomOffset -> anim!(easeOutMix(2, 0, global.delta(30, 100)), 30, 100)
+    rightOffset -> anim!(easeInOutMix(2, 0, global.delta(0, 100)), 0, 100)
+      , topOffset -> anim!(easeInOutMix(2, 0, global.delta(10, 100)), 10, 100)
+      , leftOffset -> anim!(easeInOutMix(2, 0, global.delta(20, 100)), 20, 100)
+      , bottomOffset -> anim!(easeInOutMix(2, 0, global.delta(30, 100)), 30, 100)
   }
   
   show button!(0, topOffset) @{
